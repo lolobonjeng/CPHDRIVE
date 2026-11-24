@@ -165,6 +165,18 @@
 #      a 148px preview box, a 72px icon and a visible date; mosaic stays a
 #      dense two-up grid on phones while gallery is one big card per row.
 #
+#   Search behaviour
+#  31. frontend/src/components/Search.vue + frontend/src/css/apple.css
+#      frontend/src/i18n/en.json
+#      custom.css also forces the header's search button to inline-flex, so
+#      the desktop showed the field and a second magnifier for the same
+#      action. Hidden at >=737px; the phone still needs it because the field
+#      is not in the phone header.
+#      Search runs on a 250ms debounce while typing instead of waiting for
+#      Enter, which still fires immediately. Each keystroke aborts the
+#      in-flight request. The empty state says "No results" once a search
+#      finishes with nothing, and the spinner covers the debounce window.
+#
 # The visual design is NOT inside the binary. It is served at runtime from the
 # directory named by the database setting branding.files (on the server:
 # /root/filebrowser-branding, holding custom.css and img/logo.svg). A copy
