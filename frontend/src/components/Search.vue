@@ -23,7 +23,7 @@
         :placeholder="$t('search.search')"
       />
       <i
-        v-show="ongoing"
+        v-show="ongoing || pending"
         class="material-icons spin"
         style="display: inline-block"
         >autorenew
@@ -99,9 +99,17 @@ const { currentPromptName } = storeToRefs(layoutStore);
 const prompt = ref<string>("");
 const active = ref<boolean>(false);
 const ongoing = ref<boolean>(false);
+const pending = ref<boolean>(false);
 const results = ref<any[]>([]);
 const reload = ref<boolean>(false);
 const resultsCount = ref<number>(50);
+
+// The search used to wait for Enter. Typing now schedules the same request
+// after a short pause, so the list fills in on its own. 250ms is long enough
+// that a normal typing burst sends one request, short enough that a pause
+// reads as instant.
+const SEARCH_DEBOUNCE = 250;
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
 const $showError = inject<IToastError>("$showError")!;
 
@@ -134,6 +142,23 @@ watch(currentPromptName, (newVal, oldVal) => {
 
 watch(prompt, () => {
   reset();
+
+  if (searchTimer !== undefined) {
+    clearTimeout(searchTimer);
+    searchTimer = undefined;
+  }
+
+  if (prompt.value.length === 0) {
+    pending.value = false;
+    return;
+  }
+
+  pending.value = true;
+  searchTimer = setTimeout(() => {
+    searchTimer = undefined;
+    pending.value = false;
+    void runSearch();
+  }, SEARCH_DEBOUNCE);
 });
 
 // ...mapState(useFileStore, ["isListing"]),
@@ -144,13 +169,13 @@ const isEmpty = computed(() => {
   return results.value.length === 0;
 });
 const text = computed(() => {
-  if (ongoing.value) {
+  if (ongoing.value || pending.value) {
     return "";
   }
 
   return prompt.value === ""
     ? t("search.typeToSearch")
-    : t("search.pressToSearch");
+    : t("search.noResults");
 });
 const filteredResults = computed(() => {
   return results.value.slice(0, resultsCount.value);
@@ -177,6 +202,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   abortLastSearch();
+  clearTimeout(searchTimer);
 });
 
 const open = () => {
@@ -197,9 +223,7 @@ const close = (event: Event) => {
 const keyup = (event: KeyboardEvent) => {
   if (event.key === "Escape") {
     close(event);
-    return;
   }
-  results.value.length = 0;
 };
 
 const init = (string: string) => {
@@ -210,6 +234,7 @@ const init = (string: string) => {
 const reset = () => {
   abortLastSearch();
   ongoing.value = false;
+  pending.value = false;
   resultsCount.value = 50;
   results.value = [];
 };
@@ -218,9 +243,7 @@ const abortLastSearch = () => {
   searchAbortController.abort();
 };
 
-const submit = async (event: Event) => {
-  event.preventDefault();
-
+const runSearch = async () => {
   if (prompt.value === "") {
     return;
   }
@@ -247,5 +270,16 @@ const submit = async (event: Event) => {
   }
 
   ongoing.value = false;
+};
+
+const submit = (event: Event) => {
+  event.preventDefault();
+
+  if (searchTimer !== undefined) {
+    clearTimeout(searchTimer);
+    searchTimer = undefined;
+  }
+  pending.value = false;
+  void runSearch();
 };
 </script>

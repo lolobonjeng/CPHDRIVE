@@ -218,11 +218,14 @@ header .logo {
 /* custom.css gives every header action `display: inline-flex !important`,
    which beats header.css's `header .menu-button, #more { display: none }`.
    On a desktop the rail is always visible, so the burger and the overflow
-   dots have nothing to do. !important is the only way to outrank the other
-   !important, and it is scoped to the desktop range so the drawer keeps
-   both buttons on a phone. */
+   dots have nothing to do, and the search field is already in the header,
+   so its magnifier button is a second search affordance for the same
+   action. !important is the only way to outrank the other !important, and
+   it is scoped to the desktop range so the drawer and the button both stay
+   on a phone. */
 @media (min-width: 737px) {
   main header button.menu-button,
+  main header button.search-button,
   main header button#more {
     display: none !important;
   }
