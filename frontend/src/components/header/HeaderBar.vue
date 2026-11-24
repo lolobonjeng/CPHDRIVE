@@ -1,6 +1,8 @@
 <template>
   <header>
-    <img v-if="showLogo" :src="logoURL" alt="File Browser" />
+    <div v-if="showLogo" class="logo">
+      <img :src="logoURL" alt="CPHDRIVE" />
+    </div>
     <Action
       v-if="showMenu"
       class="menu-button"

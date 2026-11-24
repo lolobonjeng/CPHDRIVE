@@ -224,9 +224,25 @@ func rawFileHandler(w http.ResponseWriter, r *http.Request, file *files.FileInfo
 	defer fd.Close()
 
 	setContentDisposition(w, r, file)
-	w.Header().Add("Content-Security-Policy", `script-src 'none';`)
+	if isHTMLFile(file.Name) {
+		// HTML previews render inside a sandboxed iframe. The CSP sandbox
+		// directive keeps the document in an opaque origin even when the raw
+		// URL is opened directly, so its scripts cannot reach the parent app.
+		w.Header().Set("Content-Security-Policy",
+			"sandbox allow-scripts allow-forms allow-popups allow-modals; "+
+				"script-src 'unsafe-inline' 'unsafe-eval' https: http: data:; "+
+				"style-src 'unsafe-inline' https: http: data:; "+
+				"img-src https: http: data:;")
+	} else {
+		w.Header().Add("Content-Security-Policy", `script-src 'none';`)
+	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "private")
 	http.ServeContent(w, r, file.Name, file.ModTime, fd)
 	return 0, nil
+}
+
+func isHTMLFile(name string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	return ext == ".html" || ext == ".htm"
 }

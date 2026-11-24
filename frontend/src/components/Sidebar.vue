@@ -1,65 +1,103 @@
 <template>
-  <div v-show="active" @click="closeHovers" class="overlay"></div>
+  <div
+    v-show="active"
+    @click="closeHovers"
+    class="overlay sidebar-scrim"
+  ></div>
   <nav :class="{ active }">
     <template v-if="isLoggedIn">
-      <button @click="toAccountSettings" class="action">
-        <i class="material-icons">person</i>
-        <span>{{ user.username }}</span>
-      </button>
-      <button
-        class="action"
-        @click="toRoot"
-        :aria-label="$t('sidebar.myFiles')"
-        :title="$t('sidebar.myFiles')"
-      >
-        <i class="material-icons">folder</i>
-        <span>{{ $t("sidebar.myFiles") }}</span>
-      </button>
-
-      <div v-if="user.perm.create">
-        <button
-          @click="showHover('newDir')"
-          class="action"
-          :aria-label="$t('sidebar.newFolder')"
-          :title="$t('sidebar.newFolder')"
-        >
-          <i class="material-icons">create_new_folder</i>
-          <span>{{ $t("sidebar.newFolder") }}</span>
-        </button>
-
-        <button
-          @click="showHover('newFile')"
-          class="action"
-          :aria-label="$t('sidebar.newFile')"
-          :title="$t('sidebar.newFile')"
-        >
-          <i class="material-icons">note_add</i>
-          <span>{{ $t("sidebar.newFile") }}</span>
-        </button>
+      <div class="brand">
+        <span>CPHDRIVE</span>
       </div>
 
-      <div v-if="user.perm.admin">
+      <button
+        v-if="isFiles && user.perm.create"
+        class="new-button"
+        @click="openNew"
+        aria-label="New"
+        title="New"
+      >
+        <i class="material-icons">add</i>
+        <span>{{ $t("buttons.new") }}</span>
+      </button>
+
+      <div class="nav-group">
         <button
           class="action"
+          :class="{ 'action--active': isFiles }"
+          @click="toRoot"
+          :aria-label="$t('sidebar.myFiles')"
+          :title="$t('sidebar.myFiles')"
+        >
+          <i class="material-icons">folder</i>
+          <span>{{ $t("sidebar.myFiles") }}</span>
+        </button>
+
+        <button
+          v-if="user.perm.admin"
+          class="action"
+          :class="{ 'action--active': $route.path === '/settings/global' }"
           @click="toGlobalSettings"
           :aria-label="$t('sidebar.settings')"
           :title="$t('sidebar.settings')"
         >
-          <i class="material-icons">settings_applications</i>
+          <i class="material-icons">settings</i>
           <span>{{ $t("sidebar.settings") }}</span>
         </button>
       </div>
-      <button
-        v-if="canLogout"
-        @click="logout"
-        class="action"
-        id="logout"
-        :aria-label="$t('sidebar.logout')"
-        :title="$t('sidebar.logout')"
-      >
-        <i class="material-icons">exit_to_app</i>
-        <span>{{ $t("sidebar.logout") }}</span>
-      </button>
+
+      <div class="nav-group">
+        <button
+          class="action"
+          :class="{ 'action--active': $route.path === '/settings/profile' }"
+          @click="toAccountSettings"
+          :aria-label="user.username"
+          :title="user.username"
+        >
+          <i class="material-icons">person</i>
+          <span>{{ user.username }}</span>
+        </button>
+
+        <button
+          class="action"
+          @click="switchTheme"
+          :aria-label="
+            $t('settings.themes.' + (activeTheme === 'dark' ? 'light' : 'dark'))
+          "
+          :title="
+            $t('settings.themes.' + (activeTheme === 'dark' ? 'light' : 'dark'))
+          "
+        >
+          <i class="material-icons">{{
+            activeTheme === "dark" ? "light_mode" : "dark_mode"
+          }}</i>
+          <span>{{
+            $t("settings.themes." + (activeTheme === "dark" ? "light" : "dark"))
+          }}</span>
+        </button>
+
+        <button
+          class="action"
+          @click="showHover('about')"
+          aria-label="About"
+          title="About"
+        >
+          <i class="material-icons">info_outline</i>
+          <span>About</span>
+        </button>
+
+        <button
+          v-if="canLogout"
+          @click="logout"
+          class="action"
+          id="logout"
+          :aria-label="$t('sidebar.logout')"
+          :title="$t('sidebar.logout')"
+        >
+          <i class="material-icons">exit_to_app</i>
+          <span>{{ $t("sidebar.logout") }}</span>
+        </button>
+      </div>
     </template>
     <template v-else>
       <router-link
@@ -85,28 +123,21 @@
       </router-link>
     </template>
 
-    <div
-      class="credits"
-      v-if="isFiles && !disableUsedPercentage"
-      style="width: 90%; margin: 2em 2.5em 3em 2.5em"
-    >
+    <div class="nav-usage" v-if="isFiles && !disableUsedPercentage">
       <progress-bar :val="usage.usedPercentage" size="small"></progress-bar>
-      <br />
-      {{ $t("sidebar.diskUsed", { used: usage.used, total: usage.total }) }}
+      <p>
+        {{ $t("sidebar.diskUsed", { used: usage.used, total: usage.total }) }}
+      </p>
     </div>
 
     <p class="credits">
-      <span>
-        <span v-if="disableExternal">File Browser</span>
-        <a
-          v-else
-          rel="noopener noreferrer"
-          target="_blank"
-          href="https://github.com/filebrowser/filebrowser"
-          >File Browser</a
+      <span
+        >CPHDRIVE<template
+          v-if="version && !version.includes('untracked')"
         >
-        <span> {{ " " }} {{ version }}</span>
-      </span>
+          ({{ version }})</template
+        ></span
+      >
       <span>
         <a @click="help">{{ $t("sidebar.help") }}</a>
       </span>
@@ -115,18 +146,18 @@
 </template>
 
 <script>
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 import { mapActions, mapState } from "pinia";
 import { useAuthStore } from "@/stores/auth";
 import { useFileStore } from "@/stores/file";
 import { useLayoutStore } from "@/stores/layout";
+import { getTheme, toggleTheme } from "@/utils/theme";
 
 import * as auth from "@/utils/auth";
 import {
   version,
   signup,
   hideLoginButton,
-  disableExternal,
   disableUsedPercentage,
   noAuth,
   logoutPage,
@@ -142,7 +173,12 @@ export default {
   name: "sidebar",
   setup() {
     const usage = reactive(USAGE_DEFAULT);
-    return { usage, usageAbortController: new AbortController() };
+    const activeTheme = ref(getTheme());
+    return {
+      usage,
+      activeTheme,
+      usageAbortController: new AbortController(),
+    };
   },
   components: {
     ProgressBar,
@@ -158,7 +194,6 @@ export default {
     signup: () => signup,
     hideLoginButton: () => hideLoginButton,
     version: () => version,
-    disableExternal: () => disableExternal,
     disableUsedPercentage: () => disableUsedPercentage,
     canLogout: () => !noAuth && (loginPage || logoutPage !== "/login"),
   },
@@ -192,6 +227,16 @@ export default {
       this.$router.push({ path: "/files" });
       this.closeHovers();
     },
+    // Drop the sidebar's own prompt before opening the menu. Otherwise closing
+    // the menu pops back to "sidebar" and the drawer slides in again on phones.
+    openNew() {
+      this.closeHovers();
+      this.showHover("new");
+    },
+    switchTheme() {
+      toggleTheme();
+      this.activeTheme = getTheme();
+    },
     toAccountSettings() {
       this.$router.push({ path: "/settings/profile" });
       this.closeHovers();
@@ -202,6 +247,15 @@ export default {
     },
     help() {
       this.showHover("help");
+    },
+    // The rail is permanent on a desktop, so a drawer left open from a phone
+    // sized window is a leftover state. It matters because the scrim is a
+    // full-screen backdrop-filter: left behind, it blurs and blocks the whole
+    // app until you click it.
+    dropDrawerOnDesktop() {
+      if (window.innerWidth >= 737 && this.active) {
+        this.closeHovers();
+      }
     },
     logout: auth.logout,
   },
@@ -215,7 +269,11 @@ export default {
       immediate: true,
     },
   },
+  mounted() {
+    window.addEventListener("resize", this.dropDrawerOnDesktop);
+  },
   unmounted() {
+    window.removeEventListener("resize", this.dropDrawerOnDesktop);
     this.abortOngoingFetchUsage();
   },
 };

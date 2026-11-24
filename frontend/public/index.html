@@ -13,7 +13,7 @@
     [{[ end ]}]
 
     <title>
-      [{[ if .Name -]}][{[ .Name ]}][{[ else ]}]File Browser[{[ end ]}]
+      [{[ if .Name -]}][{[ .Name ]}][{[ else ]}]CPHDRIVE[{[ end ]}]
     </title>
 
     <meta name="robots" content="noindex,nofollow" />
@@ -29,7 +29,7 @@
       sizes="180x180"
       href="[{[ .StaticURL ]}]/img/icons/apple-touch-icon.png"
     />
-    <meta name="apple-mobile-web-app-title" content="File Browser" />
+    <meta name="apple-mobile-web-app-title" content="CPHDRIVE" />
 
     <!-- Add to home screen for Android and modern mobile browsers -->
     <link
@@ -171,5 +171,94 @@
     [{[ if .CSS -]}]
     <link rel="stylesheet" href="[{[ .StaticURL ]}]/custom.css" />
     [{[ end ]}]
+
+    <!-- Password reveal. Adds a .cf-eye button next to every password input
+         and keeps it positioned when the layout moves. Ported from the
+         deployed build, which carried it as an inline script. -->
+    <script>
+      (() => {
+        const p = (i, b) => {
+          const n = i.parentNode;
+          n.style.position || (n.style.position = "relative");
+          b.style.top = i.offsetTop + i.offsetHeight / 2 - 16 + "px";
+          b.style.right = n.clientWidth - i.offsetLeft - i.offsetWidth + 8 + "px";
+        };
+        const d = () => {
+          document
+            .querySelectorAll(".cf-eye")
+            .forEach((b) => (b._i && b._i.isConnected) || b.remove());
+          document
+            .querySelectorAll("input[type=password],input[data-cf-eye]")
+            .forEach((n) => {
+              let b = n._b;
+              if (!n.hasAttribute("data-cf-eye")) {
+                n.setAttribute("data-cf-eye", "");
+                b = document.createElement("button");
+                b.type = "button";
+                b.className = "cf-eye";
+                b.setAttribute("aria-label", "Show password");
+                b.onpointerdown = (e) => e.preventDefault();
+                b.onclick = (e) => {
+                  e.preventDefault();
+                  const t = n.type == "password" ? "text" : "password";
+                  n.type = t;
+                  b.classList.toggle("is-on", t == "text");
+                  n.focus({ preventScroll: true });
+                };
+                b._i = n;
+                n._b = b;
+                n.parentNode.appendChild(b);
+              }
+              b.classList.toggle("is-on", n.type != "password");
+              p(n, b);
+            });
+        };
+        let t;
+        const s = () => {
+          clearTimeout(t);
+          t = setTimeout(d, 60);
+        };
+        new MutationObserver(s).observe(document.documentElement, {
+          childList: 1,
+          subtree: 1,
+        });
+        addEventListener("resize", s);
+        document.addEventListener("scroll", s, 1);
+        d();
+      })();
+    </script>
+
+    <!-- Share links are copied as the public Funnel host, not the LAN or
+         tailnet address the browser happens to be on, so a link pasted into a
+         chat works for someone outside the network. -->
+    <script>
+      (() => {
+        const P = "https://cronzph-1.taildd796b.ts.net",
+          R = (s) =>
+            typeof s == "string"
+              ? s.replace(/^https?:\/\/[^\/]+(?=\/(?:share|api\/public)\/)/, P)
+              : s,
+          c = navigator.clipboard;
+        if (c && c.writeText) {
+          const w = c.writeText.bind(c);
+          c.writeText = (t) => w(R(t));
+        }
+        const e = document.execCommand.bind(document);
+        document.execCommand = (k, ...a) => {
+          if (k == "copy") {
+            const l = document.activeElement;
+            if (
+              l &&
+              typeof l.value == "string" &&
+              /\/(?:share|api\/public)\//.test(l.value)
+            ) {
+              l.value = R(l.value);
+              l.select && l.select();
+            }
+          }
+          return e(k, ...a);
+        };
+      })();
+    </script>
   </body>
 </html>

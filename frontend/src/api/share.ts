@@ -21,6 +21,7 @@ export async function create(
   expires = "",
   unit = "hours"
 ) {
+  if (unit === "never") expires = "";
   url = removePrefix(url);
   url = `/api/share${url}`;
   if (expires !== "") {

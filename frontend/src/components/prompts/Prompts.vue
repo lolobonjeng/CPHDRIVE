@@ -1,9 +1,15 @@
 <template>
-  <base-modal v-if="modal != null" :prompt="currentPromptName" @closed="close">
-    <keep-alive>
-      <component :is="modal" />
-    </keep-alive>
-  </base-modal>
+  <Transition name="prompt">
+    <base-modal
+      v-if="modal != null"
+      :prompt="currentPromptName"
+      @closed="close"
+    >
+      <keep-alive>
+        <component :is="modal" />
+      </keep-alive>
+    </base-modal>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -13,6 +19,7 @@ import { useLayoutStore } from "@/stores/layout";
 
 import BaseModal from "./BaseModal.vue";
 import Help from "./Help.vue";
+import About from "./About.vue";
 import Info from "./Info.vue";
 import Delete from "./Delete.vue";
 import DeleteUser from "./DeleteUser.vue";
@@ -20,6 +27,7 @@ import Download from "./Download.vue";
 import Rename from "./Rename.vue";
 import Move from "./Move.vue";
 import Copy from "./Copy.vue";
+import New from "./New.vue";
 import NewFile from "./NewFile.vue";
 import NewDir from "./NewDir.vue";
 import Replace from "./Replace.vue";
@@ -37,10 +45,12 @@ const { currentPromptName } = storeToRefs(layoutStore);
 const components = new Map<string, any>([
   ["info", Info],
   ["help", Help],
+  ["about", About],
   ["delete", Delete],
   ["rename", Rename],
   ["move", Move],
   ["copy", Copy],
+  ["new", New],
   ["newFile", NewFile],
   ["newDir", NewDir],
   ["download", Download],

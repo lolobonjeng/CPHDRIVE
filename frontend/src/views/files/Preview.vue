@@ -6,7 +6,7 @@
     @mousemove="toggleNavigation"
     @touchstart="toggleNavigation"
   >
-    <header-bar v-if="isPdf || isEpub || isCsv || showNav">
+    <header-bar v-if="isPdf || isEpub || isCsv || isHtml || showNav">
       <action icon="close" :label="$t('buttons.close')" @action="close()" />
       <title>{{ name }}</title>
       <action
@@ -26,7 +26,7 @@
         />
         <action
           :disabled="layoutStore.loading"
-          v-if="isCsv && authStore.user?.perm.modify"
+          v-if="(isCsv || isHtml) && authStore.user?.perm.modify"
           icon="edit_note"
           :label="t('buttons.editAsText')"
           @action="editAsText"
@@ -125,6 +125,13 @@
         >
         </VideoPlayer>
         <object v-else-if="isPdf" class="pdf" :data="previewUrl"></object>
+        <iframe
+          v-else-if="isHtml"
+          class="html-preview"
+          :src="previewUrl"
+          sandbox="allow-scripts allow-forms allow-popups allow-modals"
+          referrerpolicy="no-referrer"
+        ></iframe>
         <div v-else-if="fileStore.req?.type == 'blob'" class="info">
           <div class="title">
             <i class="material-icons">feedback</i>
@@ -316,6 +323,11 @@ const isCsv = computed(
     fileStore.req.size <= CSV_MAX_SIZE
 );
 
+const isHtml = computed(() => {
+  const ext = fileStore.req?.extension.toLowerCase();
+  return ext === ".html" || ext === ".htm";
+});
+
 const isResizeEnabled = computed(() => resizePreview);
 
 const subtitles = computed(() => {
@@ -407,7 +419,10 @@ const updatePreview = async () => {
     autoPlay.value = false;
   }
 
-  const dirs = route.fullPath.split("/");
+  // route.path, not fullPath: fullPath carries the query string, and the last
+  // segment would come out as "test.html?preview=true". That name is then used
+  // to find the file in the listing, so the query also broke prev/next nav.
+  const dirs = route.path.split("/");
   name.value = decodeURIComponent(dirs[dirs.length - 1]);
 
   // Load CSV content if it's a CSV file
@@ -498,6 +513,11 @@ const download = () => window.open(downloadUrl.value);
 const openDirect = () => window.open(directUrl.value);
 
 const editAsText = () => {
-  router.push({ path: route.path, query: { edit: "true" } });
+  // HTML opens in the editor by default now, so it needs no query flag.
+  // CSV still does, because CSV opens in this table view.
+  router.push({
+    path: route.path,
+    query: isHtml.value ? {} : { edit: "true" },
+  });
 };
 </script>

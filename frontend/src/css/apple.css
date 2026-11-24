@@ -1,0 +1,1003 @@
+/* ==========================================================================
+   Apple-style pass
+   --------------------------------------------------------------------------
+   Imported last from styles.css, so every rule here lands after the upstream
+   sheets and wins on equal specificity. Reverting the look is one line: drop
+   the @import in styles.css.
+
+   The rules follow Apple's motion guidance rather than a visual theme:
+
+   - Response starts on pointer-down, so press states are instant (110ms)
+     and release states are slower (180ms+). Asymmetric on purpose.
+   - Curves are springs, not linear ramps. Overshoot stays under 3%.
+   - Everything animates through `transition`, never a one-shot `@keyframes`,
+     because a transition can be interrupted mid-flight and a keyframe cannot.
+   - Material means blur + saturation, never a flat translucent fill.
+   - Type tightens as it grows; small text keeps its tracking.
+   - Loading indicators keep moving under reduced-motion. They carry state.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Tokens
+   -------------------------------------------------------------------------- */
+
+:root {
+  /* Motion */
+  --ease-spring: cubic-bezier(0.32, 1.18, 0.55, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+
+  --dur-press: 110ms;
+  --dur-quick: 180ms;
+  --dur-base: 280ms;
+  --dur-sheet: 420ms;
+
+  /* Radii */
+  --r-1: 6px;
+  --r-2: 9px;
+  --r-3: 13px;
+  --r-4: 18px;
+
+  /* Sidebar width. 160px on a small laptop, 256px from 1422px up. */
+  --rail: clamp(10em, 18vw, 16em);
+
+  /* Elevation. Layered, low alpha, no glow. */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --shadow-2: 0 3px 10px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-3: 0 14px 40px rgba(0, 0, 0, 0.16), 0 3px 10px rgba(0, 0, 0, 0.06);
+  --shadow-4: 0 28px 80px rgba(0, 0, 0, 0.26), 0 10px 28px rgba(0, 0, 0, 0.1);
+
+  /* Materials */
+  --material-bar: rgba(252, 252, 253, 0.72);
+  --material-pane: rgba(255, 255, 255, 0.9);
+  --material-scrim: rgba(0, 0, 0, 0.28);
+  --blur-bar: saturate(180%) blur(24px);
+  --blur-pane: saturate(180%) blur(30px);
+
+  --hairline: rgba(0, 0, 0, 0.08);
+  --accent-tint: rgba(33, 150, 243, 0.14);
+  --accent-ring: rgba(33, 150, 243, 0.32);
+  --material-sidebar: rgba(238, 238, 242, 0.9);
+
+  /* Palette: a touch more separation between page and surface than upstream.
+     Hue identity is unchanged, only the delta. */
+  --background: rgb(243, 243, 245);
+}
+
+:root.dark {
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-2: 0 3px 12px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-3: 0 18px 48px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-4: 0 32px 90px rgba(0, 0, 0, 0.8), 0 12px 32px rgba(0, 0, 0, 0.55);
+
+  --material-bar: rgba(21, 29, 36, 0.72);
+  --material-pane: rgba(32, 41, 47, 0.9);
+  --material-scrim: rgba(0, 0, 0, 0.5);
+
+  --hairline: rgba(255, 255, 255, 0.09);
+  --accent-tint: rgba(33, 150, 243, 0.22);
+  --accent-ring: rgba(33, 150, 243, 0.42);
+  --material-sidebar: rgba(26, 35, 42, 0.9);
+
+  --background: rgb(17, 24, 30);
+  --surfacePrimary: rgb(28, 37, 44);
+  --surfaceSecondary: rgb(52, 60, 67);
+}
+
+/* --------------------------------------------------------------------------
+   2. Type
+   -------------------------------------------------------------------------- */
+
+/* One fluid root size instead of a fixed 16px. Every em in the app is measured
+   from here, so the rail, the header, the row padding and the labels all grow
+   together on a large monitor and tighten on a phone. 15px at 360, 17px at
+   1600, flat outside that range so it never gets unreadable or oversized. */
+html {
+  font-size: clamp(15px, 0.1613vw + 14.42px, 17px);
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+}
+
+header title,
+.card h2,
+.card h3,
+#login h1 {
+  letter-spacing: -0.022em;
+}
+
+.card h2 {
+  font-weight: 600;
+}
+
+/* Aligned digits in the size and modified columns. */
+#listing .item .size,
+#listing .item .modified {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   3. Focus
+   --------------------------------------------------------------------------
+   base.css kills every outline. Keyboard users get one back, pointer users
+   see nothing. Scoped to interactive elements so a focused container never
+   draws a box around the viewport.
+   -------------------------------------------------------------------------- */
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   4. Bars
+   --------------------------------------------------------------------------
+   Only the header and breadcrumbs actually have content scrolling under
+   them, so they are the only two that get a real blur. Blurring a bar with
+   nothing behind it is cost without payoff.
+   -------------------------------------------------------------------------- */
+
+/* The blur lives on a pseudo-element, not on <header> itself.
+   backdrop-filter makes an element the containing block for its
+   position: fixed descendants, and #search.active (the full-screen search)
+   and #dropdown are both fixed children of the header. Blurring the header
+   directly collapsed the search overlay to the header's own height. */
+header {
+  background: transparent;
+  border-bottom: 1px solid var(--hairline);
+  box-shadow: none;
+}
+
+header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--material-bar);
+  -webkit-backdrop-filter: var(--blur-bar);
+  backdrop-filter: var(--blur-bar);
+}
+
+/* Upstream pins the search box at 25em, so it stays 400px wide on a 1920
+   monitor and leaves a dead strip in the middle of the header. Let it track
+   the viewport instead, with a floor so it stays usable on a laptop. */
+#search {
+  max-width: clamp(14em, 30vw, 34em);
+}
+
+/* The header is fixed to the viewport, so it does not inherit main's offset.
+   The brand block stands in for the rail plus the gap main leaves, which puts
+   the search box on the same vertical line as the breadcrumbs and the listing
+   instead of crowding the sidebar's edge. */
+header .logo {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+@media (min-width: 737px) {
+  header .logo {
+    width: calc(var(--rail) + 1em);
+  }
+}
+
+/* custom.css gives every header action `display: inline-flex !important`,
+   which beats header.css's `header .menu-button, #more { display: none }`.
+   On a desktop the rail is always visible, so the burger and the overflow
+   dots have nothing to do. !important is the only way to outrank the other
+   !important, and it is scoped to the desktop range so the drawer keeps
+   both buttons on a phone. */
+@media (min-width: 737px) {
+  main header button.menu-button,
+  main header button#more {
+    display: none !important;
+  }
+}
+
+.breadcrumbs {
+  background: var(--material-bar);
+  -webkit-backdrop-filter: var(--blur-bar);
+  backdrop-filter: var(--blur-bar);
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* The previewer owns its own header styling, keep it clear. */
+#previewer header {
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom: 0;
+}
+
+#previewer header::before {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   5. Sidebar
+   --------------------------------------------------------------------------
+   Upstream rows are full-bleed with square corners and a divider above each
+   group. Inset rounded rows read as one surface.
+   -------------------------------------------------------------------------- */
+
+nav {
+  background: var(--material-sidebar);
+  border-right: 1px solid var(--hairline);
+  padding: 0.4em 0 1em;
+  /* overflow-y: auto implies overflow-x: auto, which draws a stray
+     horizontal scrollbar the moment any child is a pixel too wide. */
+  overflow-x: hidden;
+}
+
+/* Upstream snaps the rail from 16em to 10em at 1024px. That hard jump leaves
+   a 1000px window with a 160px rail and a 1440px window with a 256px one, and
+   nothing in between. Scale it instead, and keep main in step so the two never
+   disagree about how much room the rail takes. Below 737px mobile.css takes
+   over with the drawer, so this only covers the desktop range. */
+@media (min-width: 737px) {
+  nav {
+    width: var(--rail);
+  }
+
+  main {
+    width: calc(100% - var(--rail) - 3em);
+  }
+}
+
+/* Group separators are drawn as a pseudo-element so they can be inset to the
+   same width as the rows. A real border would run to the nav edges and the
+   rows would look off-centre against it. */
+nav > div.nav-group {
+  border-top: 0;
+  position: relative;
+  margin: 0.5em 0 0;
+  padding-top: 0.5em;
+}
+
+nav > div.nav-group::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0.7em;
+  right: 0.7em;
+  height: 1px;
+  background: var(--hairline);
+}
+
+nav .action {
+  width: calc(100% - 1.4em);
+  margin: 1px 0.7em;
+  border-radius: var(--r-2);
+  font-size: 0.95em;
+  letter-spacing: -0.006em;
+  padding: 0.45em 0.6em;
+  transition:
+    background-color var(--dur-press) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+nav .action:active {
+  transform: scale(0.97);
+}
+
+nav .credits {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6em;
+  margin: 1.4em 1.4em 2.4em;
+  font-size: 0.72em;
+  line-height: 1.4;
+  color: var(--textPrimary);
+}
+
+nav .credits a {
+  cursor: pointer;
+  color: inherit;
+}
+
+nav .credits a:hover {
+  color: var(--textSecondary);
+}
+
+/* --------------------------------------------------------------------------
+   Drive-style sidebar
+   --------------------------------------------------------------------------
+   A brand row, one prominent New pill, then flat rows. The pill carries the
+   only shadow in the rail, which is what makes it read as the primary action
+   instead of just another row.
+   -------------------------------------------------------------------------- */
+
+nav .brand {
+  padding: 1.15em 1.15em 0.1em;
+  color: var(--textSecondary);
+  font-size: 1.05em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+nav .new-button {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  width: calc(100% - 1.4em);
+  margin: 1.05em 0.7em 0.15em;
+  padding: 0.6em 1em;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surfacePrimary);
+  color: var(--textSecondary);
+  font-size: 0.92em;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  box-shadow: var(--shadow-2);
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    box-shadow var(--dur-quick) var(--ease-out);
+}
+
+nav .new-button:hover {
+  box-shadow: var(--shadow-3);
+}
+
+nav .new-button:active {
+  transform: scale(0.97);
+  box-shadow: var(--shadow-1);
+}
+
+nav .new-button i {
+  font-size: 1.35em;
+  line-height: 1;
+  color: var(--blue);
+}
+
+nav .action i {
+  margin-right: 0.5em;
+  font-size: 1.12em;
+  vertical-align: -0.15em;
+  color: var(--textPrimary);
+}
+
+nav .action--active {
+  background: var(--accent-tint);
+}
+
+nav .action--active i {
+  color: var(--blue);
+}
+
+nav .nav-usage {
+  margin: 1.8em 1.4em 0;
+}
+
+nav .nav-usage p {
+  margin: 0.55em 0 0;
+  font-size: 0.76em;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+  color: var(--textPrimary);
+}
+
+/* Below the mobile breakpoint the sidebar slides over the listing, so it does
+   have content underneath it. A plain translucent fill lets the file names
+   read through at 10%, which looks like a rendering bug. Blur them away. */
+@media (max-width: 736px) {
+  nav {
+    background: var(--material-pane);
+    -webkit-backdrop-filter: var(--blur-pane);
+    backdrop-filter: var(--blur-pane);
+    border-right: 0;
+    box-shadow: var(--shadow-3);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   6. Press states
+   --------------------------------------------------------------------------
+   Instant on the way down, eased on the way up. That asymmetry is what makes
+   a button feel like it heard you.
+   -------------------------------------------------------------------------- */
+
+.button {
+  border-radius: var(--r-2);
+  border: 0;
+  box-shadow: none;
+  font-weight: 500;
+  letter-spacing: -0.006em;
+  transition:
+    background-color var(--dur-press) var(--ease-out),
+    transform var(--dur-press) var(--ease-out),
+    box-shadow var(--dur-quick) var(--ease-out);
+}
+
+.button:hover {
+  box-shadow: var(--shadow-1);
+}
+
+.button:active:not([disabled]) {
+  transform: scale(0.97);
+}
+
+.action {
+  transition:
+    background-color var(--dur-press) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+.action:active:not(.disabled) {
+  transform: scale(0.97);
+}
+
+/* --------------------------------------------------------------------------
+   7. Listing
+   -------------------------------------------------------------------------- */
+
+#listing .item {
+  transition:
+    background-color var(--dur-press) var(--ease-out),
+    transform var(--dur-press) var(--ease-out),
+    box-shadow var(--dur-quick) var(--ease-out);
+}
+
+/* List mode: dividers instead of boxes. */
+#listing.list .item {
+  border: 0;
+  border-bottom: 1px solid var(--divider);
+  padding: 0.9em 1em;
+}
+
+/* Upstream paints every row with --surfacePrimary, which turns a list into a
+   stack of cards. A list wants dividers on the page, not slabs. */
+#listing.list .item:not(.header) {
+  background: transparent;
+}
+
+#listing.list .item:not(.header):hover {
+  background: var(--surfaceSecondary);
+}
+
+#listing.list .item:not(.header):active {
+  background: var(--accent-tint);
+}
+
+#listing.list .item.header {
+  background: transparent;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* The column labels have to clear the icon column that the rows reserve,
+   otherwise "Name" sits 3em left of every file name under it. The row padding
+   is matched too, so the 50/25/25 column split lands on the same pixels. */
+@media (min-width: 737px) {
+  #listing.list .item.header {
+    padding: 0.9em 1em;
+  }
+}
+
+#listing.list .item.header > div {
+  margin-left: 3em;
+  width: calc(100% - 3em);
+}
+
+/* Upstream pads the Name label by 3em to clear the icon column. That column
+   is already accounted for above, so keeping both double-counts it. */
+#listing.list .item.header .name {
+  margin-right: 0;
+}
+
+/* Mosaic mode: lift on hover, settle on press. */
+#listing.mosaic .item {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-1);
+}
+
+#listing.mosaic .item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2) !important;
+}
+
+#listing.mosaic .item:active {
+  transform: translateY(0) scale(0.985);
+  box-shadow: var(--shadow-1) !important;
+  transition-duration: var(--dur-press);
+}
+
+/* Selection stays a filled accent, like Finder. Just softened at the edge. */
+#listing .item[aria-selected="true"] {
+  box-shadow: 0 2px 10px var(--accent-ring);
+}
+
+#listing.mosaic .item[aria-selected="true"] {
+  border-radius: var(--r-3);
+}
+
+/* Gallery cards fill their top half with an image, so the corners have to be
+   clipped or the photo squares off inside the rounded card. */
+#listing.mosaic.gallery .item {
+  overflow: hidden;
+}
+
+/* Multi-select bar */
+#listing #multiple-selection {
+  border-radius: var(--r-4) var(--r-4) 0 0;
+  box-shadow: var(--shadow-3);
+  transition: bottom var(--dur-base) var(--ease-spring);
+}
+
+/* --------------------------------------------------------------------------
+   8. Surfaces
+   -------------------------------------------------------------------------- */
+
+.card {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-4);
+  box-shadow: var(--shadow-1);
+}
+
+.card.floating {
+  background: var(--material-pane);
+  -webkit-backdrop-filter: var(--blur-pane);
+  backdrop-filter: var(--blur-pane);
+  box-shadow: var(--shadow-4);
+}
+
+.card .card-title {
+  padding: 1.4em 1.4em 0.8em;
+}
+
+.card > div {
+  padding: 1em 1.4em;
+}
+
+.card > div:last-child {
+  padding-bottom: 1.4em;
+}
+
+/* The scrim rule in BaseModal.vue is scoped to a data attribute, so the
+   only way to reach it from here is with !important. Worth it: keeping the
+   whole design layer in one file beats editing fifteen components. */
+#modal-background {
+  background-color: var(--material-scrim) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+}
+
+/* --------------------------------------------------------------------------
+   9. Modal transition
+   --------------------------------------------------------------------------
+   Applied by the <Transition name="prompt"> wrapper in Prompts.vue. The card
+   scales from 0.92 with a spring while the scrim fades faster, so the sheet
+   reads as arriving from behind the glass.
+   -------------------------------------------------------------------------- */
+
+.prompt-enter-active {
+  transition: opacity var(--dur-quick) var(--ease-out);
+}
+
+.prompt-leave-active {
+  transition: opacity var(--dur-press) var(--ease-in);
+}
+
+.prompt-enter-from,
+.prompt-leave-to {
+  opacity: 0;
+}
+
+.prompt-enter-active .card.floating {
+  transition:
+    transform var(--dur-sheet) var(--ease-spring),
+    opacity var(--dur-base) var(--ease-out);
+}
+
+.prompt-leave-active .card.floating {
+  transition:
+    transform var(--dur-press) var(--ease-in),
+    opacity var(--dur-press) var(--ease-in);
+}
+
+/* .card.floating is centred by translate, so every keyframe has to carry it. */
+.prompt-enter-from .card.floating {
+  transform: translate(-50%, -50%) scale(0.92);
+  opacity: 0;
+}
+
+.prompt-leave-to .card.floating {
+  transform: translate(-50%, -50%) scale(0.97);
+  opacity: 0;
+}
+
+/* The running instance has a soft blue bloom in the top-right corner. Kept
+   faint and fixed so it never scrolls with the listing. */
+:root.dark body {
+  background-image: radial-gradient(
+    115% 85% at 100% 0%,
+    rgba(38, 118, 188, 0.2),
+    rgba(20, 29, 36, 0) 62%
+  );
+  background-attachment: fixed;
+}
+
+/* --------------------------------------------------------------------------
+   9.1 New menu
+   --------------------------------------------------------------------------
+   Four rows, no chrome. Each row is a full-width button so the whole strip is
+   clickable, and the subtitle explains what the row does without a tooltip.
+   -------------------------------------------------------------------------- */
+
+.new-card {
+  width: min(24em, 92vw);
+}
+
+.new-card .card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1em;
+  padding: 0.2em 0.55em 0.7em;
+}
+
+.new-option {
+  display: flex;
+  align-items: center;
+  gap: 0.85em;
+  width: 100%;
+  padding: 0.68em 0.8em;
+  border: 0;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--textSecondary);
+  text-align: left;
+  transition:
+    background-color var(--dur-press) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+.new-option:hover {
+  background: var(--hover);
+}
+
+.new-option:active {
+  transform: scale(0.985);
+}
+
+.new-option i {
+  flex: 0 0 auto;
+  width: 1.45em;
+  font-size: 1.55em;
+  line-height: 1;
+  text-align: center;
+  color: var(--blue);
+}
+
+.new-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12em;
+  min-width: 0;
+}
+
+.new-option strong {
+  font-size: 0.95em;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.new-option small {
+  font-size: 0.78em;
+  letter-spacing: -0.005em;
+  color: var(--textPrimary);
+}
+
+.new-divider {
+  height: 1px;
+  margin: 0.4em 0.8em;
+  background: var(--hairline);
+}
+
+/* --------------------------------------------------------------------------
+   10. Menus
+   -------------------------------------------------------------------------- */
+
+.context-menu {
+  background: var(--material-pane);
+  -webkit-backdrop-filter: var(--blur-bar);
+  backdrop-filter: var(--blur-bar);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-3);
+  padding: 0.3em;
+  overflow: hidden;
+  transform-origin: top left;
+  animation: menu-in var(--dur-quick) var(--ease-out);
+}
+
+.context-menu .action {
+  border-radius: var(--r-1);
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+}
+
+#dropdown {
+  border-radius: var(--r-3);
+}
+
+/* The dropdown is a popover only below the mobile breakpoint. On desktop it
+   is the inline row of header icons and must stay fully visible, so the
+   material and the hidden-by-default opacity live inside the media query. */
+@media (max-width: 736px) {
+  #dropdown {
+    background: var(--material-pane);
+    -webkit-backdrop-filter: var(--blur-pane);
+    backdrop-filter: var(--blur-pane);
+    box-shadow: var(--shadow-3);
+    overflow: hidden;
+    opacity: 0;
+    transition:
+      transform var(--dur-base) var(--ease-spring),
+      opacity var(--dur-quick) var(--ease-out);
+  }
+
+  #dropdown.active {
+    opacity: 1;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   11. Inputs
+   -------------------------------------------------------------------------- */
+
+.input {
+  border-color: var(--hairline);
+  border-radius: var(--r-2);
+  transition:
+    border-color var(--dur-quick) var(--ease-out),
+    box-shadow var(--dur-quick) var(--ease-out);
+}
+
+.input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+
+/* Native checkboxes render as 13px black-outlined squares on a dark page.
+   accent-color is enough to make them belong without a custom control. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--blue);
+  width: 1.05em;
+  height: 1.05em;
+  vertical-align: -0.15em;
+  cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   12. Previewer
+   --------------------------------------------------------------------------
+   Full-bleed black becomes a heavy material, so an image sits on glass
+   rather than on a void.
+   -------------------------------------------------------------------------- */
+#previewer {
+  background-color: rgba(0, 0, 0, 0.88);
+  -webkit-backdrop-filter: blur(50px) saturate(140%);
+  backdrop-filter: blur(50px) saturate(140%);
+  animation: previewer-in var(--dur-base) var(--ease-out);
+}
+
+@keyframes previewer-in {
+  from {
+    opacity: 0;
+  }
+}
+
+#previewer .preview .html-preview {
+  border-radius: 0;
+}
+
+/* --------------------------------------------------------------------------
+   13. Login
+   -------------------------------------------------------------------------- */
+
+#login {
+  background: var(--background);
+}
+
+#login form {
+  max-width: 18em;
+  padding: 2em 1.75em;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-4);
+  background: var(--surfacePrimary);
+  box-shadow: var(--shadow-3);
+}
+
+#login h1 {
+  font-size: 1.6em;
+  font-weight: 600;
+  margin: 0.5em 0 1.2em;
+}
+
+/* --------------------------------------------------------------------------
+   14. Search and shell
+   -------------------------------------------------------------------------- */
+
+#search #input {
+  border-radius: var(--r-2);
+}
+
+#search.active #input {
+  background: var(--material-bar);
+  -webkit-backdrop-filter: var(--blur-bar);
+  backdrop-filter: var(--blur-bar);
+  border-bottom: 1px solid var(--hairline);
+  box-shadow: none;
+}
+
+#search.active > div {
+  border-radius: 0 !important;
+}
+
+#search #result {
+  background: var(--material-bar);
+  -webkit-backdrop-filter: var(--blur-bar);
+  backdrop-filter: var(--blur-bar);
+}
+
+/* The field is always focused while the overlay is open, so a focus ring just
+   draws a 1400px blue rectangle around it. The bar itself is the indicator. */
+#search input:focus-visible {
+  outline: 0;
+}
+
+#search .boxes {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+}
+
+#search .boxes > div > div {
+  border-radius: var(--r-2);
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    filter var(--dur-quick) var(--ease-out);
+}
+
+#search .boxes > div > div:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+#search .boxes > div > div:active {
+  transform: scale(0.98);
+  transition-duration: var(--dur-press);
+}
+
+.shell {
+  background: var(--material-pane);
+  -webkit-backdrop-filter: var(--blur-pane);
+  backdrop-filter: var(--blur-pane);
+  border-top: 1px solid var(--hairline);
+  box-shadow: var(--shadow-3);
+}
+
+.shell__content {
+  box-shadow: none;
+}
+
+/* Mobile floating selection bar */
+#file-selection {
+  border-radius: var(--r-4);
+  box-shadow: var(--shadow-3);
+}
+
+/* The scrim behind the mobile sidebar */
+.overlay {
+  background-color: rgba(0, 0, 0, 0.32);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* The scrim only makes sense while the rail is a drawer. On a desktop there
+   is nothing to dim, and one left behind by a resize keeps its blur over the
+   whole app and swallows every click. Sidebar.vue also closes the drawer when
+   the breakpoint is crossed; this is the belt to that pair of braces. */
+@media (min-width: 737px) {
+  .sidebar-scrim {
+    display: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   15. Scrollbars
+   -------------------------------------------------------------------------- */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--borderSecondary) transparent;
+}
+
+/* --------------------------------------------------------------------------
+   16. Fallbacks
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Spinners tell you work is happening. Keep them turning. */
+  i.spin,
+  main .spinner > div,
+  #previewer .spinner > div {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  #listing.mosaic .item:hover,
+  #listing.mosaic .item:active {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  header,
+  header::before,
+  .breadcrumbs,
+  .card.floating,
+  .context-menu,
+  #dropdown,
+  #previewer,
+  #modal-background,
+  #search.active #input,
+  #search #result,
+  .shell,
+  .overlay {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  header::before,
+  .breadcrumbs,
+  #search.active #input,
+  #search #result {
+    background: var(--surfacePrimary);
+  }
+
+  .card.floating,
+  .context-menu,
+  #dropdown,
+  .shell {
+    background: var(--surfacePrimary);
+  }
+
+  #modal-background {
+    background-color: rgba(0, 0, 0, 0.6) !important;
+  }
+
+  #previewer {
+    background-color: #000;
+  }
+
+  .overlay {
+    background-color: rgba(0, 0, 0, 0.6);
+  }
+}

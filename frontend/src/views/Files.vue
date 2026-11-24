@@ -76,6 +76,15 @@ const currentView = computed(() => {
     }
     return Preview;
   } else if (
+    [".html", ".htm"].includes(fileStore.req.extension.toLowerCase())
+  ) {
+    // HTML files open in the Editor. The rendered view lives at ?preview=true
+    // and is reached from the editor's preview button.
+    if (route.query.preview === "true") {
+      return Preview;
+    }
+    return Editor;
+  } else if (
     fileStore.req.type === "text" ||
     fileStore.req.type === "textImmutable"
   ) {

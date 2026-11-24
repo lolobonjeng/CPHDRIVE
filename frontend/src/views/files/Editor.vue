@@ -28,7 +28,7 @@
         icon="preview"
         :label="t('buttons.preview')"
         @action="preview()"
-        v-show="isMarkdownFile"
+        v-show="isMarkdownFile || isHtmlFile"
       />
     </header-bar>
 
@@ -119,6 +119,9 @@ const previewContent = ref("");
 const isMarkdownFile =
   fileStore.req?.name.endsWith(".md") ||
   fileStore.req?.name.endsWith(".markdown");
+const isHtmlFile =
+  fileStore.req?.name.toLowerCase().endsWith(".html") ||
+  fileStore.req?.name.toLowerCase().endsWith(".htm");
 const katexOptions = {
   output: "mathml" as const,
   throwOnError: false,
@@ -322,7 +325,13 @@ const finishClose = () => {
 };
 
 const preview = () => {
-  isPreview.value = !isPreview.value;
+  // Markdown previews inline. HTML has a real route because the document is
+  // rendered in a sandboxed iframe, so hand it to the router instead.
+  if (!isHtmlFile) {
+    isPreview.value = !isPreview.value;
+    return;
+  }
+  router.push({ path: route.path, query: { preview: "true" } });
 };
 </script>
 

@@ -101,7 +101,7 @@
             :aria-label="$t('time.unit')"
             tabindex="2"
           >
-            <option value="seconds">{{ $t("time.seconds") }}</option>
+            <option value="never">Never</option>
             <option value="minutes">{{ $t("time.minutes") }}</option>
             <option value="hours">{{ $t("time.hours") }}</option>
             <option value="days">{{ $t("time.days") }}</option>

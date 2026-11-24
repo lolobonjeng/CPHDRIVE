@@ -2,7 +2,13 @@ import { theme } from "./constants";
 import "ace-builds";
 import { themesByName } from "ace-builds/src-noconflict/ext-themelist";
 
+const THEME_STORAGE_KEY = "filebrowser.theme";
+
 export const getTheme = (): UserTheme => {
+  const stored = localStorage.getItem(THEME_STORAGE_KEY);
+  if (stored === "light" || stored === "dark") {
+    return stored;
+  }
   return (document.documentElement.className as UserTheme) || theme;
 };
 
@@ -17,11 +23,8 @@ export const setTheme = (theme: UserTheme) => {
 
 export const toggleTheme = (): void => {
   const activeTheme = getTheme();
-  if (activeTheme === "light") {
-    setTheme("dark");
-  } else {
-    setTheme("light");
-  }
+  setTheme(activeTheme === "light" ? "dark" : "light");
+  localStorage.setItem(THEME_STORAGE_KEY, document.documentElement.className);
 };
 
 export const getMediaPreference = (): UserTheme => {
