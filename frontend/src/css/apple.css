@@ -59,6 +59,11 @@
   --accent-ring: rgba(33, 150, 243, 0.32);
   --material-sidebar: rgba(238, 238, 242, 0.9);
 
+  /* Small filter chips. A tint plus a stroke reads the same in both themes;
+     --surfaceSecondary flips from lighter-than-page to darker-than-page. */
+  --chip-fill: rgba(0, 0, 0, 0.045);
+  --chip-stroke: rgba(0, 0, 0, 0.12);
+
   /* Palette: a touch more separation between page and surface than upstream.
      Hue identity is unchanged, only the delta. */
   --background: rgb(243, 243, 245);
@@ -78,6 +83,9 @@
   --accent-tint: rgba(33, 150, 243, 0.22);
   --accent-ring: rgba(33, 150, 243, 0.42);
   --material-sidebar: rgba(26, 35, 42, 0.9);
+
+  --chip-fill: rgba(255, 255, 255, 0.06);
+  --chip-stroke: rgba(255, 255, 255, 0.11);
 
   --background: rgb(17, 24, 30);
   --surfacePrimary: rgb(28, 37, 44);
@@ -952,34 +960,131 @@ input[type="radio"] {
   backdrop-filter: var(--blur-bar);
 }
 
+/* The empty state starts right under the bar, which leaves the "Types" label
+   touching the divider. A little air separates the toolbar from the content. */
+#search.active #result {
+  padding-top: 1.15em;
+}
+
 /* The field is always focused while the overlay is open, so a focus ring just
    draws a 1400px blue rectangle around it. The bar itself is the indicator. */
 #search input:focus-visible {
   outline: 0;
 }
 
+/* custom.css rounds the field into a pill with a 4px focus ring. That reads
+   fine in the 25em header slot, but the overlay stretches the same element
+   across the whole window, so the ring becomes a full-width rounded outline
+   and the bar looks like a focused text box rather than a toolbar. Its
+   `#search input:focus` rule ties with a plain `#search.active input` on
+   specificity, so the focused state has to be named here as well. */
+#search.active #input,
+#search.active #input:focus-within {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: var(--material-bar) !important;
+}
+
+#search.active input,
+#search.active input:focus {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+  background: transparent !important;
+}
+
+/* Four type filters on an empty search. Upstream paints them as 10em-wide
+   blue slabs with a 3.5em icon, which is the heaviest thing on the screen and
+   makes the overlay read as a dashboard. Same four targets, chip size. */
 #search .boxes {
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-3);
-  box-shadow: var(--shadow-2);
-  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+#search .boxes h3 {
+  margin: 0 0 0.5em;
+  padding: 0;
+  font-size: 0.6875em;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--textSecondary);
+}
+
+#search .boxes > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5em;
+  margin: 0;
+  max-width: 34em;
 }
 
 #search .boxes > div > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  width: auto;
+  margin: 0;
+  padding: 0.7em 0.6em;
+  flex-grow: 0;
+  border: 1px solid var(--chip-stroke);
   border-radius: var(--r-2);
+  background: var(--chip-fill);
+  color: var(--textPrimary);
+  text-align: center;
+  box-shadow: var(--shadow-1);
   transition:
     transform var(--dur-press) var(--ease-out),
-    filter var(--dur-quick) var(--ease-out);
+    background-color var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out);
 }
 
 #search .boxes > div > div:hover {
   transform: translateY(-1px);
-  filter: brightness(1.08);
+  background: var(--accent-tint);
+  border-color: var(--accent-ring);
 }
 
 #search .boxes > div > div:active {
   transform: scale(0.98);
   transition-duration: var(--dur-press);
+}
+
+#search .boxes i {
+  font-size: 1.35em;
+  line-height: 1;
+  color: var(--blue) !important;
+}
+
+#search .boxes p {
+  margin: 0;
+  font-size: 0.78em;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--textSecondary);
+}
+
+#search .boxes > div > div:hover p {
+  color: var(--textPrimary);
+}
+
+/* Two columns on a phone. Four chips at 390px would be 80px wide each, which
+   is under the comfortable tap target. */
+@media (max-width: 599px) {
+  #search .boxes > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #search .boxes > div > div {
+    padding: 0.75em 0.5em;
+  }
 }
 
 .shell {

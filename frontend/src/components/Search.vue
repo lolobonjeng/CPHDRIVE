@@ -36,7 +36,7 @@
     <div id="result" ref="result">
       <div>
         <template v-if="isEmpty">
-          <p>{{ text }}</p>
+          <p v-if="prompt.length !== 0">{{ text }}</p>
 
           <template v-if="prompt.length === 0">
             <div class="boxes">
