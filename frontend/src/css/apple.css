@@ -167,12 +167,29 @@ header::before {
   backdrop-filter: var(--blur-bar);
 }
 
-/* Upstream pins the search box at 25em, so it stays 400px wide on a 1920
-   monitor and leaves a dead strip in the middle of the header. Let it track
-   the viewport instead, with a floor so it stays usable on a laptop. */
-#search {
-  max-width: clamp(14em, 30vw, 34em);
+/* custom.css paints a backdrop-filter on <header> itself, which brings the
+   containing-block trap back: #search.active is a fixed child and its
+   height: 100% then resolves to the header's own 59px instead of the
+   viewport, so the full-screen search renders as a thin strip with the page
+   showing through underneath. The blur already comes from ::before, so the
+   property on the element is pure downside. */
+main header {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
+
+/* The search box fills the header's full content height, which on a wide
+   screen reads as a slab rather than a field. Give it a fixed 2.5em height,
+   centre it, and cap the width so it stops before the action icons instead of
+   running a third of the way across the bar. */
+#search {
+  height: 2.5em;
+  align-self: center;
+  max-width: clamp(11em, 22vw, 24em);
+}
+
+/* The full-screen search keeps its own height and width; #search.active is
+   more specific, so it still wins over the rule above. */
 
 /* The header is fixed to the viewport, so it does not inherit main's offset.
    The brand block stands in for the rail plus the gap main leaves, which puts
@@ -521,10 +538,89 @@ nav .nav-usage p {
   border-radius: var(--r-3);
 }
 
-/* Gallery cards fill their top half with an image, so the corners have to be
-   clipped or the photo squares off inside the rounded card. */
+/* Gallery mode is supposed to be the "big cards" view, but custom.css gives
+   both mosaic modes the same 184px grid and the same 56px icon box, and
+   overrides upstream's gallery sizing. The two buttons then produced identical
+   screens. Give gallery its own column width, a tall preview box, and the
+   modification date under the name, so the difference is visible at a glance
+   even in a folder of plain files. */
+#listing.mosaic.gallery > div:not([id]):not(.context-menu) {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
 #listing.mosaic.gallery .item {
+  min-height: 224px;
+  padding: 16px 14px 14px !important;
   overflow: hidden;
+}
+
+#listing.mosaic.gallery .item > div:first-child {
+  height: 148px !important;
+  margin-bottom: 10px;
+}
+
+#listing.mosaic.gallery .item > div:first-child i.material-icons {
+  font-size: 72px !important;
+}
+
+/* Thumbnails should fill the preview box instead of sitting at their natural
+   size in the middle of it. */
+#listing.mosaic.gallery .item > div:first-child img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+/* Keep the name in the flow. Upstream floats it over the bottom of the card,
+   which covers the preview it exists to show. */
+#listing.mosaic.gallery .item > div:last-child {
+  position: static;
+  width: 100%;
+  padding: 0;
+  text-align: center;
+}
+
+#listing.mosaic.gallery .item .name {
+  font-size: 0.875rem !important;
+}
+
+/* custom.css hides this in mosaic; gallery is the mode where the date is
+   worth the second line. */
+#listing.mosaic.gallery .item .modified {
+  display: block !important;
+  margin-top: 3px;
+  font-size: 0.75rem;
+  color: var(--textSecondary);
+}
+
+/* On a phone both grids fall to the same 148px tracks, because custom.css
+   sets them with !important under 700px, so the two views look alike again.
+   Mosaic becomes two-up and gallery stays one big card per row. */
+@media (max-width: 736px) {
+  #listing.mosaic:not(.gallery) > div:not([id]):not(.context-menu) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  #listing.mosaic.gallery > div:not([id]):not(.context-menu) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  #listing.mosaic.gallery .item {
+    min-height: 236px;
+    padding: 14px 12px 12px !important;
+  }
+
+  #listing.mosaic.gallery .item > div:first-child {
+    height: 168px !important;
+  }
+
+  #listing.mosaic.gallery .item > div:first-child i.material-icons {
+    font-size: 64px !important;
+  }
 }
 
 /* Multi-select bar */

@@ -145,6 +145,20 @@
 #      permanent. The class matters: .overlay is shared with the header
 #      dropdown and the share page, which must keep their own behaviour.
 #
+#   Search and view modes
+#  30. frontend/src/css/apple.css
+#      The search box filled the header's full content height and ran to 34em,
+#      which read as a slab. It is now 2.5em tall, centred, and capped at
+#      24em. The same rule also exposed a live bug: custom.css puts a
+#      backdrop-filter on <header>, which makes it the containing block for
+#      #search.active, so the full-screen search collapsed to the header's
+#      59px and the page showed through under it. The element-level filter is
+#      forced off; the blur stays on header::before.
+#      The two mosaic modes had become identical because custom.css gave both
+#      the same 184px grid and 56px icon box. Gallery now uses 280px columns,
+#      a 148px preview box, a 72px icon and a visible date; mosaic stays a
+#      dense two-up grid on phones while gallery is one big card per row.
+#
 # The visual design is NOT inside the binary. It is served at runtime from the
 # directory named by the database setting branding.files (on the server:
 # /root/filebrowser-branding, holding custom.css and img/logo.svg). A copy
