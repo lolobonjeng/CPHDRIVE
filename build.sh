@@ -146,7 +146,7 @@
 #      dropdown and the share page, which must keep their own behaviour.
 #
 #   Search and view modes
-#  30. frontend/src/css/apple.css
+#  30. frontend/src/css/apple.css + frontend/src/components/Search.vue
 #      The search box filled the header's full content height and ran to 34em,
 #      which read as a slab. It is now 2.5em tall, centred, and capped at
 #      24em. The same rule also exposed a live bug: custom.css puts a
@@ -154,6 +154,12 @@
 #      #search.active, so the full-screen search collapsed to the header's
 #      59px and the page showed through under it. The element-level filter is
 #      forced off; the blur stays on header::before.
+#      The empty-search type filters were four 10em blue slabs with a 3.5em
+#      icon. They are 136x48 chips now, four-up on desktop and two-up under
+#      600px, and Search.vue hides the redundant "Type to search..." line
+#      while they are on screen. custom.css's pill border and focus ring are
+#      dropped while the overlay is open, where they stretch across the
+#      window.
 #      The two mosaic modes had become identical because custom.css gave both
 #      the same 184px grid and 56px icon box. Gallery now uses 280px columns,
 #      a 148px preview box, a 72px icon and a visible date; mosaic stays a
