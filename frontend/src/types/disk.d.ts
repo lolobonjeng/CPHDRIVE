@@ -40,4 +40,24 @@ interface IUserUsage {
   quota: number;
   diskID: number;
   offline: boolean;
+  unknown?: boolean;
+}
+
+interface IBrowseEntry {
+  name: string;
+  path: string;
+  mount: boolean;
+  readOnly: boolean;
+  selectable: boolean;
+  reason?: "root" | "server-root" | "not-mount" | "registered" | "nested";
+  total?: number;
+  free?: number;
+}
+
+interface IBrowseResult {
+  path: string;
+  parent: string;
+  selectable: boolean;
+  reason?: IBrowseEntry["reason"];
+  entries: IBrowseEntry[];
 }

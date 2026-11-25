@@ -99,7 +99,7 @@ func (s *Storage) Path(id uint) (string, error) {
 
 // Validate normalizes a disk and refuses paths that would make quotas or
 // scopes ambiguous. It mutates Name and Path to their normalized form.
-func Validate(d *Disk, serverRoot string, others []*Disk) error {
+func Validate(ctx context.Context, d *Disk, serverRoot string, others []*Disk) error {
 	d.Name = strings.TrimSpace(d.Name)
 	d.Path = strings.TrimSpace(d.Path)
 
@@ -149,11 +149,16 @@ func Validate(d *Disk, serverRoot string, others []*Disk) error {
 		if samePath(root, resolved) {
 			return fmt.Errorf("%w: the server root is the system disk", fberrors.ErrDiskInvalid)
 		}
-		if isSubpath(root, resolved) {
-			return fmt.Errorf("%w: the disk is inside the served root", fberrors.ErrDiskInvalid)
-		}
 		if isSubpath(resolved, root) {
 			return fmt.Errorf("%w: the served root is inside this disk", fberrors.ErrDiskInvalid)
+		}
+		// A mount point inside the served root is a separate device, so it can
+		// be a disk of its own: the external drive mounted at /root/External is
+		// the common case. A plain subdirectory cannot, because its bytes are
+		// already counted by the system disk and one tenant's home would sit
+		// inside another tenant's view.
+		if isSubpath(root, resolved) && !IsMountPoint(ctx, resolved) {
+			return fmt.Errorf("%w: %s is inside the served root but is not a mount point", fberrors.ErrDiskInvalid, resolved)
 		}
 	}
 
@@ -206,7 +211,7 @@ var skipMountPrefixes = []string{
 // could safely hold a user's home. It is best-effort: a platform that does not
 // expose partitions simply returns an empty list.
 func Detect(ctx context.Context, serverRoot string, existing []*Disk) []Candidate {
-	parts, err := gopsutil.PartitionsWithContext(ctx, false)
+	mounts, err := Mounts(ctx)
 	if err != nil {
 		return []Candidate{}
 	}
@@ -217,25 +222,20 @@ func Detect(ctx context.Context, serverRoot string, existing []*Disk) []Candidat
 	}
 
 	seen := map[string]struct{}{}
-	out := make([]Candidate, 0, len(parts))
+	out := make([]Candidate, 0, len(mounts))
 
-	for _, p := range parts {
-		mount := strings.TrimSpace(p.Mountpoint)
-		if mount == "" || !filepath.IsAbs(mount) {
+	for _, m := range mounts {
+		if _, skip := skipFSTypes[strings.ToLower(m.FSType)]; skip {
 			continue
 		}
-
-		if _, skip := skipFSTypes[strings.ToLower(p.Fstype)]; skip {
+		if m.ReadOnly {
 			continue
 		}
-		if !mountWritable(p.Opts) {
-			continue
-		}
-		if hasSkippedPrefix(mount) {
+		if hasSkippedPrefix(m.Path) {
 			continue
 		}
 
-		resolved, evalErr := filepath.EvalSymlinks(filepath.Clean(mount))
+		resolved, evalErr := filepath.EvalSymlinks(m.Path)
 		if evalErr != nil {
 			continue
 		}
@@ -244,7 +244,11 @@ func Detect(ctx context.Context, serverRoot string, existing []*Disk) []Candidat
 		if _, dup := seen[resolved]; dup {
 			continue
 		}
-		if serverRoot != "" && (samePath(root, resolved) || isSubpath(root, resolved) || isSubpath(resolved, root)) {
+
+		// A mount that holds the served root, or is the served root itself,
+		// cannot be a disk: its bytes would overlap the system disk. A mount
+		// inside the served root can, because it is a different device.
+		if serverRoot != "" && (samePath(root, resolved) || isSubpath(resolved, root)) {
 			continue
 		}
 		if conflictsWithDisk(resolved, existing) {
@@ -269,7 +273,7 @@ func Detect(ctx context.Context, serverRoot string, existing []*Disk) []Candidat
 		out = append(out, Candidate{
 			Name:   name,
 			Path:   resolved,
-			FSType: p.Fstype,
+			FSType: m.FSType,
 			Total:  u.Total,
 			Free:   u.Free,
 		})
@@ -302,10 +306,11 @@ func SafetyReserve(total uint64) int64 {
 	return reserve
 }
 
-// DirSize sums the regular files under root.
+// DirSize sums the regular files under root. It does not cross into another
+// filesystem, so a mount that happens to sit inside root is not counted.
 func DirSize(root string) (int64, error) {
 	var total int64
-	err := filepath.Walk(root, func(_ string, info os.FileInfo, err error) error {
+	err := walkSameDevice(root, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

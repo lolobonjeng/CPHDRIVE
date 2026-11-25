@@ -47,8 +47,15 @@
                 }}
               </td>
               <td>
+                <span v-if="usageLoading" class="user-usage user-usage--pending"
+                  >…</span
+                >
                 <span
-                  v-if="usages[user.id] && !usages[user.id].offline"
+                  v-else-if="
+                    usages[user.id] &&
+                    !usages[user.id].offline &&
+                    !usages[user.id].unknown
+                  "
                   class="user-usage"
                 >
                   {{ prettyBytes(usages[user.id].used, { binary: true }) }}
@@ -84,6 +91,7 @@ const error = ref<StatusError | null>(null);
 const users = ref<IUser[]>([]);
 const usages = ref<Record<number, IUserUsage>>({});
 const diskNames = ref<Record<number, string>>({});
+const usageLoading = ref(true);
 
 const layoutStore = useLayoutStore();
 const { t } = useI18n();
@@ -106,19 +114,27 @@ onMounted(async () => {
     diskNames.value = Object.fromEntries(
       diskList.map((disk) => [disk.id, disk.name])
     );
-
-    try {
-      const usageList = await api.getUsage();
-      usages.value = Object.fromEntries(usageList.map((u) => [u.id, u]));
-    } catch (e) {
-      // The quota column still works; the live usage column stays empty.
-    }
   } catch (err) {
     if (err instanceof Error) {
       error.value = err;
     }
-  } finally {
+    usageLoading.value = false;
     layoutStore.loading = false;
+    return;
+  }
+
+  layoutStore.loading = false;
+
+  // Usage is a directory walk per user on the server. Filling the column after
+  // the table is already on screen means a slow home can never hold the whole
+  // page behind a spinner.
+  try {
+    const usageList = await api.getUsage();
+    usages.value = Object.fromEntries(usageList.map((u) => [u.id, u]));
+  } catch (e) {
+    // The quota column still works; the live usage column stays empty.
+  } finally {
+    usageLoading.value = false;
   }
 });
 </script>

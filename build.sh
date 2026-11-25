@@ -201,6 +201,24 @@
 #      Offline, login returns 503 after the password checks out (no user
 #      enumeration), and TUS no longer retries 507/503.
 #
+#  33. A disk may now be a mount point inside the served root. The external
+#      drive mounted at /root/External used to be invisible to Detect and
+#      rejected by Validate, because both refused any path under the server
+#      root. They still refuse a plain subdirectory; the new rule is that a
+#      path inside the root has to be its own mount point, so its bytes live
+#      on a different device.
+#      Every tree walk stays on one filesystem (disks.SameDevice, walkSameDevice
+#      in disks/, filepath.SkipDir in quota.walkUsed and http.treeSize). Walking
+#      into the external drive took 408 s for 179,577 files against 1 s for
+#      5,158 on the root filesystem, which is what left the user list spinning:
+#      /api/users/usage walked it per user with no deadline. That endpoint now
+#      has a 20 s budget and returns the row without a number when it runs out,
+#      and the page renders the table before it asks for usage.
+#      New admin endpoint GET /api/disks/browse?path= lists directories only,
+#      skips dot-directories, and reports for each one whether it can become a
+#      disk and why not. The disk form uses it through a folder picker modal
+#      (components/settings/DiskPathPicker.vue) instead of a typed path.
+#
 # The visual design is NOT inside the binary. It is served at runtime from the
 # directory named by the database setting branding.files (on the server:
 # /root/filebrowser-branding, holding custom.css and img/logo.svg). A copy

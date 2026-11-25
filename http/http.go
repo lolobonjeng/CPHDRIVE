@@ -66,6 +66,7 @@ func NewHandler(
 	disksAPI.Handle("", monkey(disksGetHandler, "")).Methods("GET")
 	disksAPI.Handle("", monkey(diskPostHandler, "")).Methods("POST")
 	disksAPI.Handle("/detect", monkey(diskDetectHandler, "")).Methods("GET")
+	disksAPI.Handle("/browse", monkey(diskBrowseHandler, "")).Methods("GET")
 	disksAPI.Handle("/{id:[0-9]+}", monkey(diskPutHandler, "")).Methods("PUT")
 	disksAPI.Handle("/{id:[0-9]+}", monkey(diskDeleteHandler, "")).Methods("DELETE")
 

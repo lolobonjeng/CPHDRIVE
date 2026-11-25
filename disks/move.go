@@ -58,7 +58,7 @@ func MoveTree(ctx context.Context, src, dst string, progress func(MoveProgress),
 	var copied int64
 	var lastCheck int64
 
-	err = filepath.Walk(src, func(p string, info os.FileInfo, walkErr error) error {
+	err = walkSameDevice(src, func(p string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -111,9 +111,10 @@ func MoveTree(ctx context.Context, src, dst string, progress func(MoveProgress),
 }
 
 // VerifyTree checks that every source entry exists at the destination with the
-// same type and, for regular files, the same size.
+// same type and, for regular files, the same size. It skips the same entries
+// MoveTree skipped, so a mount inside the home does not fail the check.
 func VerifyTree(src, dst string) error {
-	return filepath.Walk(src, func(p string, info os.FileInfo, err error) error {
+	return walkSameDevice(src, func(p string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

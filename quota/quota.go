@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -244,6 +245,7 @@ func freeSpace(ctx context.Context, path string) (int64, error) {
 
 func walkUsed(ctx context.Context, fs afero.Fs) (int64, error) {
 	var total int64
+	var rootInfo os.FileInfo
 
 	err := afero.Walk(fs, "/", func(p string, info os.FileInfo, err error) error {
 		if ctxErr := ctx.Err(); ctxErr != nil {
@@ -260,6 +262,23 @@ func walkUsed(ctx context.Context, fs afero.Fs) (int64, error) {
 		if info == nil {
 			return nil
 		}
+
+		if info.IsDir() {
+			if rootInfo == nil {
+				rootInfo = info
+				return nil
+			}
+			if !disks.SameDevice(rootInfo, info) {
+				// Another filesystem mounted inside the home. Its bytes belong
+				// to a different disk, so they are not this user's usage, and
+				// walking them would stall the check: a 900 GB external drive
+				// inside the served root took 408 s to walk versus 1 s for the
+				// root filesystem alone.
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
 		if info.Mode().IsRegular() {
 			total += info.Size()
 		}

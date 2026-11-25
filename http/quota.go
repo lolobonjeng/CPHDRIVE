@@ -5,11 +5,13 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync/atomic"
 
 	"github.com/spf13/afero"
 
+	"github.com/filebrowser/filebrowser/v2/disks"
 	fberrors "github.com/filebrowser/filebrowser/v2/errors"
 	"github.com/filebrowser/filebrowser/v2/quota"
 )
@@ -107,11 +109,25 @@ func (c *countingReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// treeSize sums the regular files under root in a user's filesystem.
+// treeSize sums the regular files under root in a user's filesystem. It does
+// not cross into another filesystem, so a mount that happens to sit inside the
+// tree is not charged to the user.
 func treeSize(fs afero.Fs, root string) int64 {
 	var total int64
+	var rootInfo os.FileInfo
+
 	_ = afero.Walk(fs, root, func(_ string, info os.FileInfo, err error) error {
 		if err != nil || info == nil {
+			return nil
+		}
+		if info.IsDir() {
+			if rootInfo == nil {
+				rootInfo = info
+				return nil
+			}
+			if !disks.SameDevice(rootInfo, info) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if info.Mode().IsRegular() {

@@ -1,6 +1,7 @@
 package disks
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -10,14 +11,14 @@ import (
 )
 
 func TestValidateRejectsRelativePath(t *testing.T) {
-	err := Validate(&Disk{Path: "mnt/data"}, "", nil)
+	err := Validate(context.Background(), &Disk{Path: "mnt/data"}, "", nil)
 	if !errors.Is(err, fberrors.ErrDiskInvalid) {
 		t.Fatalf("err = %v, want ErrDiskInvalid", err)
 	}
 }
 
 func TestValidateRejectsMissingPath(t *testing.T) {
-	err := Validate(&Disk{Path: filepath.Join(t.TempDir(), "nope")}, "", nil)
+	err := Validate(context.Background(), &Disk{Path: filepath.Join(t.TempDir(), "nope")}, "", nil)
 	if !errors.Is(err, fberrors.ErrDiskInvalid) {
 		t.Fatalf("err = %v, want ErrDiskInvalid", err)
 	}
@@ -25,7 +26,7 @@ func TestValidateRejectsMissingPath(t *testing.T) {
 
 func TestValidateRejectsServerRoot(t *testing.T) {
 	root := t.TempDir()
-	err := Validate(&Disk{Path: root}, root, nil)
+	err := Validate(context.Background(), &Disk{Path: root}, root, nil)
 	if !errors.Is(err, fberrors.ErrDiskInvalid) {
 		t.Fatalf("err = %v, want ErrDiskInvalid", err)
 	}
@@ -38,7 +39,7 @@ func TestValidateRejectsDiskInsideServedRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := Validate(&Disk{Path: inside}, root, nil)
+	err := Validate(context.Background(), &Disk{Path: inside}, root, nil)
 	if !errors.Is(err, fberrors.ErrDiskInvalid) {
 		t.Fatalf("err = %v, want ErrDiskInvalid", err)
 	}
@@ -51,7 +52,7 @@ func TestValidateRejectsNestedDisks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := Validate(&Disk{Path: child}, "", []*Disk{{ID: 1, Name: "parent", Path: parent}})
+	err := Validate(context.Background(), &Disk{Path: child}, "", []*Disk{{ID: 1, Name: "parent", Path: parent}})
 	if !errors.Is(err, fberrors.ErrDiskInvalid) {
 		t.Fatalf("err = %v, want ErrDiskInvalid", err)
 	}
@@ -59,7 +60,7 @@ func TestValidateRejectsNestedDisks(t *testing.T) {
 
 func TestValidateRejectsDuplicatePath(t *testing.T) {
 	dir := t.TempDir()
-	err := Validate(&Disk{Path: dir}, "", []*Disk{{ID: 1, Name: "one", Path: dir}})
+	err := Validate(context.Background(), &Disk{Path: dir}, "", []*Disk{{ID: 1, Name: "one", Path: dir}})
 	if !errors.Is(err, fberrors.ErrDiskInvalid) {
 		t.Fatalf("err = %v, want ErrDiskInvalid", err)
 	}
@@ -69,7 +70,7 @@ func TestValidateAcceptsAndNormalizes(t *testing.T) {
 	dir := t.TempDir()
 	d := &Disk{Path: dir + string(filepath.Separator)}
 
-	if err := Validate(d, "", nil); err != nil {
+	if err := Validate(context.Background(), d, "", nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

@@ -32,6 +32,11 @@ export async function detect(): Promise<IDiskCandidate[]> {
   return fetchJSON<IDiskCandidate[]>("/api/disks/detect", {});
 }
 
+export async function browse(path: string): Promise<IBrowseResult> {
+  const query = path ? `?path=${encodeURIComponent(path)}` : "";
+  return fetchJSON<IBrowseResult>(`/api/disks/browse${query}`, {});
+}
+
 export async function moveUser(
   userID: number,
   diskID: number

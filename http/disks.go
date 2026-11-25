@@ -20,6 +20,11 @@ import (
 	fberrors "github.com/filebrowser/filebrowser/v2/errors"
 )
 
+// usageBudget bounds how long the users table waits for its usage numbers. A
+// user whose home is slow to walk comes back without a number instead of
+// blocking the whole page.
+const usageBudget = 20 * time.Second
+
 type diskInfo struct {
 	ID            uint      `json:"id"`
 	Name          string    `json:"name"`
@@ -111,7 +116,7 @@ var diskPostHandler = withAdmin(func(w http.ResponseWriter, r *http.Request, d *
 	}
 
 	disk := &disks.Disk{Name: body.Name, Path: body.Path, CreatedAt: time.Now()}
-	if err := disks.Validate(disk, d.server.Root, existing); err != nil {
+	if err := disks.Validate(r.Context(), disk, d.server.Root, existing); err != nil {
 		return http.StatusBadRequest, err
 	}
 
@@ -152,7 +157,7 @@ var diskPutHandler = withAdmin(func(w http.ResponseWriter, r *http.Request, d *d
 	updated := *disk
 	updated.Name = body.Name
 	updated.Path = body.Path
-	if err := disks.Validate(&updated, d.server.Root, existing); err != nil {
+	if err := disks.Validate(r.Context(), &updated, d.server.Root, existing); err != nil {
 		return http.StatusBadRequest, err
 	}
 
@@ -209,12 +214,29 @@ var diskDetectHandler = withAdmin(func(w http.ResponseWriter, r *http.Request, d
 	return renderJSON(w, r, disks.Detect(r.Context(), d.server.Root, stored))
 })
 
+var diskBrowseHandler = withAdmin(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
+	stored, err := d.store.Disks.Gets()
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	res, err := disks.Browse(r.Context(), r.URL.Query().Get("path"), d.server.Root, stored)
+	if err != nil {
+		return http.StatusBadRequest, err
+	}
+
+	return renderJSON(w, r, res)
+})
+
 type userUsage struct {
 	ID      uint  `json:"id"`
 	Used    int64 `json:"used"`
 	Quota   int64 `json:"quota"`
 	DiskID  uint  `json:"diskID"`
 	Offline bool  `json:"offline"`
+	// Unknown is set when the walk could not finish inside the budget, so the
+	// client shows a dash instead of a misleading zero.
+	Unknown bool `json:"unknown"`
 }
 
 var usersUsageHandler = withAdmin(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
@@ -222,6 +244,12 @@ var usersUsageHandler = withAdmin(func(w http.ResponseWriter, r *http.Request, d
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
+
+	// Usage is a directory walk per user. The budget keeps one slow home from
+	// holding the whole table behind a spinner; a user whose walk does not
+	// finish simply comes back without a number.
+	ctx, cancel := context.WithTimeout(r.Context(), usageBudget)
+	defer cancel()
 
 	out := make([]userUsage, 0, len(all))
 	for _, u := range all {
@@ -232,9 +260,17 @@ var usersUsageHandler = withAdmin(func(w http.ResponseWriter, r *http.Request, d
 			continue
 		}
 
-		used, err := d.store.Quota.Used(r.Context(), u)
+		if ctx.Err() != nil {
+			entry.Unknown = true
+			out = append(out, entry)
+			continue
+		}
+
+		used, err := d.store.Quota.Used(ctx, u)
 		if err == nil {
 			entry.Used = used
+		} else {
+			entry.Unknown = true
 		}
 		out = append(out, entry)
 	}

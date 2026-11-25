@@ -35,19 +35,21 @@
               </label>
               <label class="disk-form-path">
                 <span>{{ t("settings.diskPath") }}</span>
-                <input
-                  class="input"
-                  v-model.trim="form.path"
-                  placeholder="/mnt/disk2"
-                  list="disk-paths"
-                />
-                <datalist id="disk-paths">
-                  <option
-                    v-for="candidate in candidates"
-                    :key="candidate.path"
-                    :value="candidate.path"
-                  ></option>
-                </datalist>
+                <div class="disk-path-field">
+                  <span
+                    class="disk-path-value"
+                    :class="{ 'disk-path-value--empty': !form.path }"
+                  >
+                    {{ form.path || t("settings.noFolderChosen") }}
+                  </span>
+                  <button
+                    type="button"
+                    class="button button--flat button--grey"
+                    @click="picker.open = true"
+                  >
+                    {{ t("settings.browse") }}
+                  </button>
+                </div>
               </label>
               <div class="disk-form-actions">
                 <button
@@ -211,6 +213,13 @@
       </div>
     </div>
   </div>
+
+  <disk-path-picker
+    v-if="picker.open"
+    :initial-path="form.path"
+    @close="picker.open = false"
+    @select="applyPickedPath"
+  />
 </template>
 
 <script setup lang="ts">
@@ -222,6 +231,7 @@ import { disks as api } from "@/api";
 import { StatusError } from "@/api/utils";
 import { useLayoutStore } from "@/stores/layout";
 import ProgressBar from "@/components/ProgressBar.vue";
+import DiskPathPicker from "@/components/settings/DiskPathPicker.vue";
 import Errors from "@/views/Errors.vue";
 
 const { t } = useI18n();
@@ -245,6 +255,10 @@ const form = reactive({
 const detect = reactive({
   open: false,
   loading: false,
+});
+
+const picker = reactive({
+  open: false,
 });
 
 const usedPercent = (disk: IDisk) => {
@@ -292,6 +306,17 @@ const startEdit = (disk: IDisk) => {
 const cancelForm = () => {
   form.open = false;
   form.error = "";
+};
+
+const applyPickedPath = (path: string) => {
+  form.path = path;
+  picker.open = false;
+  form.error = "";
+
+  // Only name a brand-new disk, and only when the admin has not typed one yet.
+  if (form.id === 0 && !form.name.trim()) {
+    form.name = path.split(/[\\/]/).filter(Boolean).pop() ?? "";
+  }
 };
 
 const submitForm = async () => {

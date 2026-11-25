@@ -7,6 +7,9 @@ rice-box.go
 /filebrowser.exe
 /filebrowser-linux-386
 /filebrowser-preview.exe
+# The Go linker renames the old exe to <name>~ when it cannot replace it, which
+# happens whenever a preview server is still running.
+/filebrowser-preview.exe~
 /test-root/
 /dist
 .venv

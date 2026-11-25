@@ -318,7 +318,20 @@
     "quotaExceeded": "Storage quota reached. Delete some files or ask the admin for more space.",
     "noSpace": "Not enough storage space. Delete some files or ask the admin for more space.",
     "diskFull": "The disk does not have enough free space.",
-    "currentPassword": "Your Current Password"
+    "currentPassword": "Your Current Password",
+    "pickFolder": "Choose a folder",
+    "selectFolder": "Select this folder",
+    "browse": "Browse…",
+    "noFolderChosen": "No folder chosen yet",
+    "parentFolder": "Parent folder",
+    "noSubfolders": "No subfolders here.",
+    "diskMount": "Drive",
+    "diskReadOnly": "Read-only",
+    "reasonRoot": "The filesystem root cannot be a disk.",
+    "reasonServerRoot": "This is the folder File Browser serves, or it contains it.",
+    "reasonNotMount": "Inside the served folder but not a separate drive.",
+    "reasonRegistered": "This folder is already a disk.",
+    "reasonNested": "This folder is inside another disk, or contains one."
   },
   "sidebar": {
     "diskUsed": "{used} of {total} used",
