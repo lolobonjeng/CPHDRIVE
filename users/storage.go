@@ -22,6 +22,10 @@ type StorageBackend interface {
 
 type Store interface {
 	Get(baseScope string, followExternalSymlinks bool, id interface{}) (user *User, err error)
+	// GetByUsername returns the stored row without resolving its filesystem.
+	// It exists for callers that must inspect a user whose disk is offline,
+	// where Get fails before the row is usable.
+	GetByUsername(username string) (*User, error)
 	GetByScope(scope string) (*User, error)
 	Gets(baseScope string, followExternalSymlinks bool) ([]*User, error)
 	Update(user *User, fields ...string) error
@@ -31,11 +35,17 @@ type Store interface {
 	LastUpdate(id uint) int64
 }
 
+// DiskProvider resolves a disk ID to the directory that holds user homes.
+type DiskProvider interface {
+	Path(id uint) (string, error)
+}
+
 // Storage is a users storage.
 type Storage struct {
 	back    StorageBackend
 	updated map[uint]int64
 	mux     sync.RWMutex
+	disks   DiskProvider
 
 	// provision serializes the scope-collision check and the save of newly
 	// provisioned users, which must not interleave. See SaveProvisioned.
@@ -50,6 +60,25 @@ func NewStorage(back StorageBackend) *Storage {
 	}
 }
 
+// SetDisks wires the disk registry used to resolve a user's home. It is set
+// once at startup, before any request is served.
+func (s *Storage) SetDisks(d DiskProvider) {
+	s.disks = d
+}
+
+// scope resolves the base directory that holds this user's home. Users on the
+// system disk keep using the server root; everyone else is rooted at their
+// registered disk.
+func (s *Storage) scope(base string, u *User) (string, error) {
+	if u.DiskID == 0 {
+		return base, nil
+	}
+	if s.disks == nil {
+		return "", fberrors.ErrDiskUnavailable
+	}
+	return s.disks.Path(u.DiskID)
+}
+
 // Get allows you to get a user by its name or username. The provided
 // id must be a string for username lookup or a uint for id lookup. If id
 // is neither, a ErrInvalidDataType will be returned.
@@ -58,10 +87,22 @@ func (s *Storage) Get(baseScope string, followExternalSymlinks bool, id interfac
 	if err != nil {
 		return
 	}
-	if err := user.Clean(baseScope, followExternalSymlinks); err != nil {
+
+	scope, err := s.scope(baseScope, user)
+	if err != nil {
+		return nil, err
+	}
+	if err := user.Clean(scope, followExternalSymlinks); err != nil {
 		return nil, err
 	}
 	return
+}
+
+// GetByUsername returns the stored user row, without setting up its
+// filesystem. It is meant for cases that must still read the account while its
+// disk is unavailable.
+func (s *Storage) GetByUsername(username string) (*User, error) {
+	return s.back.GetBy(username)
 }
 
 // GetByScope returns the first user whose scope matches the given one, or
@@ -79,7 +120,19 @@ func (s *Storage) Gets(baseScope string, followExternalSymlinks bool) ([]*User, 
 	}
 
 	for _, user := range users {
-		if err := user.Clean(baseScope, followExternalSymlinks); err != nil {
+		scope, err := s.scope(baseScope, user)
+		if err != nil {
+			// A listing must still show the account when its disk is gone,
+			// otherwise one unplugged drive hides every other user. The flag
+			// lets the admin see which account needs attention.
+			if errors.Is(err, fberrors.ErrDiskUnavailable) {
+				user.DiskOffline = true
+				continue
+			}
+			return nil, err
+		}
+
+		if err := user.Clean(scope, followExternalSymlinks); err != nil {
 			return nil, err
 		}
 	}

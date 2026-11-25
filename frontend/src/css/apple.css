@@ -1135,7 +1135,393 @@ input[type="radio"] {
 }
 
 /* --------------------------------------------------------------------------
-   16. Fallbacks
+   16. Disks
+   -------------------------------------------------------------------------- */
+
+.disk-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.disk-intro {
+  max-width: 68ch;
+  margin: 0 0 18px;
+}
+
+.disk-form,
+.disk-detect {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-3);
+  background: var(--surfaceSecondary);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.disk-form-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.disk-form-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--textSecondary);
+}
+
+.disk-form-row .input {
+  min-width: 180px;
+}
+
+.disk-form-path {
+  flex: 1 1 280px;
+}
+
+.disk-form-path .input {
+  width: 100%;
+}
+
+.disk-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.disk-form-error {
+  margin: 10px 0 0;
+  color: #ff453a;
+}
+
+.disk-detect h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.disk-detect-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.disk-detect-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) 2fr auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-2);
+  background: var(--surfacePrimary);
+  color: var(--textPrimary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out);
+}
+
+.disk-detect-row:hover {
+  border-color: var(--accent-ring);
+}
+
+.disk-detect-row:active {
+  transform: scale(0.99);
+}
+
+.disk-detect-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.disk-detect-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.74rem;
+  color: var(--textSecondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.disk-detect-meta {
+  font-size: 0.74rem;
+  color: var(--textSecondary);
+  white-space: nowrap;
+}
+
+.disks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.disk-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-3);
+  background: var(--surfacePrimary);
+  box-shadow: var(--shadow-1);
+}
+
+.disk-card--offline {
+  border-color: rgba(255, 149, 0, 0.45);
+}
+
+.disk-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.disk-card-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.disk-path {
+  margin: 2px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--textSecondary);
+  overflow-wrap: anywhere;
+}
+
+.disk-badge {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.disk-badge--system {
+  background: var(--chip-fill);
+  color: var(--textSecondary);
+}
+
+.disk-badge--online {
+  background: rgba(52, 199, 89, 0.16);
+  color: #34c759;
+}
+
+.disk-badge--offline {
+  background: rgba(255, 149, 0, 0.18);
+  color: #ff9500;
+}
+
+.disk-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.74rem;
+  color: var(--textSecondary);
+}
+
+.disk-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.disk-users {
+  font-size: 0.74rem;
+  color: var(--textSecondary);
+}
+
+.disk-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.disk-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.8rem;
+}
+
+.disk-offline-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #ff9500;
+}
+
+/* The admin-only disk list in the rail. It is a compact read-out, not a
+   second navigation tree: one row per disk with its free space. */
+.nav-disks .nav-label {
+  margin: 0 1.4em 0.4em;
+  font-size: 0.68em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--textSecondary);
+}
+
+.disk-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0.42em 1.4em;
+  border: 0;
+  background: none;
+  color: var(--textPrimary);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-press) var(--ease-out);
+}
+
+.disk-row:hover {
+  background: var(--chip-fill);
+}
+
+.disk-row .material-icons {
+  font-size: 18px;
+  color: var(--textSecondary);
+}
+
+.disk-row-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.78em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.disk-mini-bar {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--chip-fill);
+  overflow: hidden;
+}
+
+.disk-mini-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width var(--dur-quick) var(--ease-out);
+}
+
+.disk-row-free {
+  flex: 0 0 auto;
+  font-size: 0.66em;
+  color: var(--textSecondary);
+  white-space: nowrap;
+}
+
+.disk-row-offline {
+  color: #ff9500;
+}
+
+.nav-usage-label {
+  margin: 0 0 0.35em !important;
+  font-size: 0.68em !important;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--textSecondary) !important;
+}
+
+.nav-usage--over p {
+  color: #ff453a;
+}
+
+.user-table-wrap {
+  overflow-x: auto;
+}
+
+.user-table-wrap table {
+  min-width: 760px;
+}
+
+.user-usage {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.user-usage-bar {
+  display: inline-block;
+  width: 48px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--chip-fill);
+  overflow: hidden;
+}
+
+.user-usage-bar > span {
+  display: block;
+  height: 100%;
+  background: #0a84ff;
+  border-radius: 2px;
+}
+
+.user-offline {
+  color: #ff9500;
+}
+
+.move-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  text-align: left;
+}
+
+.move-progress p {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.user-storage {
+  margin-top: 1.2em;
+  padding-top: 1em;
+  border-top: 1px solid var(--hairline);
+}
+
+/* Moving a user copies every byte of their home before the switch, so the
+   warning earns a colour instead of blending in with the helper text. The
+   branding sheet forces every paragraph inside .dashboard to secondary text
+   with !important, hence the extra specificity and the flag. */
+.dashboard .user-storage p.user-storage-warning {
+  color: #ff9500 !important;
+}
+
+@media (max-width: 736px) {
+  .disks-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .disk-detect-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .disk-detect-path {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   17. Fallbacks
    -------------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {

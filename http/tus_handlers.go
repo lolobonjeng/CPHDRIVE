@@ -103,8 +103,34 @@ func tusPostHandler(cache UploadCache) handleFunc {
 			fileFlags |= os.O_TRUNC
 		}
 
+		uploadLength, err := getUploadLength(r)
+		if err != nil || uploadLength < 0 {
+			return http.StatusBadRequest, fmt.Errorf("invalid upload length: %w", err)
+		}
+
+		oldSize := int64(0)
+		if file != nil {
+			oldSize = file.Size
+		}
+		delta := uploadLength - oldSize
+		if delta < 0 {
+			delta = 0
+		}
+
+		diskPath, err := d.diskPath()
+		if err != nil {
+			return errToStatus(err), err
+		}
+
+		uploadKey := "tus:" + d.user.FullPath(r.URL.Path)
+		_, release, err := d.store.Quota.Reserve(r.Context(), d.user, diskPath, uploadKey, delta)
+		if err != nil {
+			return errToStatus(err), err
+		}
+
 		openFile, err := d.user.Fs.OpenFile(r.URL.Path, fileFlags, d.settings.FileMode)
 		if err != nil {
+			release()
 			return errToStatus(err), err
 		}
 		defer openFile.Close()
@@ -119,12 +145,8 @@ func tusPostHandler(cache UploadCache) handleFunc {
 			Content:    false,
 		})
 		if err != nil {
+			release()
 			return errToStatus(err), err
-		}
-
-		uploadLength, err := getUploadLength(r)
-		if err != nil || uploadLength < 0 {
-			return http.StatusBadRequest, fmt.Errorf("invalid upload length: %w", err)
 		}
 
 		// Enables the user to utilize the PATCH endpoint for uploading file data.
@@ -132,6 +154,7 @@ func tusPostHandler(cache UploadCache) handleFunc {
 		// scoped filesystem, so eviction cannot follow a symlink out of scope.
 		uploadPath := r.URL.Path
 		cache.Register(file.RealPath(), uploadLength, func() error {
+			d.store.Quota.Release(d.user.ID, uploadKey)
 			return d.user.Fs.Remove(uploadPath)
 		})
 
@@ -227,6 +250,24 @@ func tusPatchUpload(w http.ResponseWriter, r *http.Request, d *data, cache Uploa
 		return http.StatusBadRequest, fmt.Errorf("upload offset %d exceeds declared length %d", uploadOffset, uploadLength)
 	}
 
+	// The POST holds the reservation for the whole upload. If it is gone —
+	// the server restarted, or the upload predates this feature — take it
+	// again for the bytes that are still missing.
+	uploadKey := "tus:" + d.user.FullPath(r.URL.Path)
+	if !d.store.Quota.HasReservation(d.user.ID, uploadKey) {
+		diskPath, err := d.diskPath()
+		if err != nil {
+			return errToStatus(err), err
+		}
+		need := uploadLength - file.Size
+		if need < 0 {
+			need = 0
+		}
+		if _, _, err := d.store.Quota.Reserve(r.Context(), d.user, diskPath, uploadKey, need); err != nil {
+			return errToStatus(err), err
+		}
+	}
+
 	// Prevent the upload from being evicted during the transfer
 	stop := keepUploadActive(cache, file.RealPath())
 	defer stop()
@@ -242,7 +283,10 @@ func tusPatchUpload(w http.ResponseWriter, r *http.Request, d *data, cache Uploa
 		)
 	}
 
-	openFile, err := d.user.Fs.OpenFile(r.URL.Path, os.O_WRONLY|os.O_APPEND, d.settings.FileMode)
+	// No O_APPEND here: the offset is set explicitly below, and on Windows an
+	// append-mode handle is opened without the write right that Truncate needs,
+	// which breaks the rollback of an over-length chunk.
+	openFile, err := d.user.Fs.OpenFile(r.URL.Path, os.O_WRONLY, d.settings.FileMode)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("could not open file: %w", err)
 	}
@@ -287,6 +331,8 @@ func tusPatchUpload(w http.ResponseWriter, r *http.Request, d *data, cache Uploa
 
 	if newOffset >= uploadLength {
 		cache.Complete(file.RealPath())
+		d.store.Quota.Release(d.user.ID, uploadKey)
+		d.store.Quota.Invalidate(d.user.ID)
 		_ = d.RunHook(func() error { return nil }, "upload", r.URL.Path, "", d.user)
 	}
 
@@ -322,6 +368,8 @@ func tusDeleteHandler(cache UploadCache) handleFunc {
 		}
 
 		cache.Complete(file.RealPath())
+		d.store.Quota.Release(d.user.ID, "tus:"+d.user.FullPath(r.URL.Path))
+		d.store.Quota.Invalidate(d.user.ID)
 
 		return http.StatusNoContent, nil
 	})

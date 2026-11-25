@@ -32,6 +32,13 @@ func (m *mockUserStore) GetByScope(scope string) (*users.User, error) {
 	return nil, fberrors.ErrNotExist
 }
 
+func (m *mockUserStore) GetByUsername(username string) (*users.User, error) {
+	if u, ok := m.users[username]; ok {
+		return u, nil
+	}
+	return nil, fberrors.ErrNotExist
+}
+
 func (m *mockUserStore) Gets(_ string, _ bool) ([]*users.User, error) { return nil, nil }
 func (m *mockUserStore) Update(_ *users.User, _ ...string) error      { return nil }
 func (m *mockUserStore) Save(user *users.User) error {

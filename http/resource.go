@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,10 +16,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/filebrowser/filebrowser/v2/disks"
 	fberrors "github.com/filebrowser/filebrowser/v2/errors"
 	"github.com/filebrowser/filebrowser/v2/files"
 	"github.com/filebrowser/filebrowser/v2/fileutils"
-	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/spf13/afero"
 )
 
@@ -118,6 +119,8 @@ func resourceDeleteHandler(fileCache FileCache) handleFunc {
 			return errToStatus(err), err
 		}
 
+		size := treeSize(d.user.Fs, r.URL.Path)
+
 		err = d.RunHook(func() error {
 			return d.user.Fs.RemoveAll(r.URL.Path)
 		}, "delete", r.URL.Path, "", d.user)
@@ -126,6 +129,7 @@ func resourceDeleteHandler(fileCache FileCache) handleFunc {
 			return errToStatus(err), err
 		}
 
+		d.store.Quota.Add(d.user.ID, -size)
 		return http.StatusNoContent, nil
 	})
 }
@@ -168,10 +172,31 @@ func resourcePostHandler(fileCache FileCache) handleFunc {
 			}
 		}
 
+		guard, err := d.beginWrite(r.Context(), r.URL.Path, r.ContentLength, r.ContentLength < 0)
+		if err != nil {
+			return errToStatus(err), err
+		}
+		defer guard.cancel()
+
+		writeLimit := guard.maxWrite()
+		var written int64
+		over := false
+
 		err = d.RunHook(func() error {
-			info, writeErr := writeFile(d.user.Fs, r.URL.Path, r.Body, d.settings.FileMode, d.settings.DirMode)
+			var body io.Reader = r.Body
+			if writeLimit < math.MaxInt64 {
+				body = io.LimitReader(r.Body, writeLimit+1)
+			}
+
+			counter := &countingReader{r: body}
+			info, writeErr := writeFile(d.user.Fs, r.URL.Path, counter, d.settings.FileMode, d.settings.DirMode)
+			written = counter.n
 			if writeErr != nil {
 				return writeErr
+			}
+			if counter.n > writeLimit {
+				over = true
+				return fberrors.ErrQuotaExceeded
 			}
 
 			etag := fmt.Sprintf(`"%x%x"`, info.ModTime().UnixNano(), info.Size())
@@ -179,11 +204,15 @@ func resourcePostHandler(fileCache FileCache) handleFunc {
 			return nil
 		}, "upload", r.URL.Path, "", d.user)
 
-		if err != nil {
+		if over || err != nil {
 			_ = d.user.Fs.RemoveAll(r.URL.Path)
 		}
+		if err != nil {
+			return errToStatus(err), err
+		}
 
-		return errToStatus(err), err
+		guard.finish(d.store.Quota, d.user.ID, written)
+		return 0, nil
 	})
 }
 
@@ -205,10 +234,31 @@ var resourcePutHandler = withUser(func(w http.ResponseWriter, r *http.Request, d
 		return http.StatusNotFound, nil
 	}
 
+	guard, err := d.beginWrite(r.Context(), r.URL.Path, r.ContentLength, r.ContentLength < 0)
+	if err != nil {
+		return errToStatus(err), err
+	}
+	defer guard.cancel()
+
+	writeLimit := guard.maxWrite()
+	var written int64
+	over := false
+
 	err = d.RunHook(func() error {
-		info, writeErr := writeFile(d.user.Fs, r.URL.Path, r.Body, d.settings.FileMode, d.settings.DirMode)
+		var body io.Reader = r.Body
+		if writeLimit < math.MaxInt64 {
+			body = io.LimitReader(r.Body, writeLimit+1)
+		}
+
+		counter := &countingReader{r: body}
+		info, writeErr := writeFile(d.user.Fs, r.URL.Path, counter, d.settings.FileMode, d.settings.DirMode)
+		written = counter.n
 		if writeErr != nil {
 			return writeErr
+		}
+		if counter.n > writeLimit {
+			over = true
+			return fberrors.ErrQuotaExceeded
 		}
 
 		etag := fmt.Sprintf(`"%x%x"`, info.ModTime().UnixNano(), info.Size())
@@ -216,7 +266,15 @@ var resourcePutHandler = withUser(func(w http.ResponseWriter, r *http.Request, d
 		return nil
 	}, "save", r.URL.Path, "", d.user)
 
-	return errToStatus(err), err
+	if over {
+		_ = d.user.Fs.RemoveAll(r.URL.Path)
+	}
+	if err != nil {
+		return errToStatus(err), err
+	}
+
+	guard.finish(d.store.Quota, d.user.ID, written)
+	return 0, nil
 })
 
 func resourcePatchHandler(fileCache FileCache) handleFunc {
@@ -267,9 +325,27 @@ func resourcePatchHandler(fileCache FileCache) handleFunc {
 			return errToStatus(err), err
 		}
 
+		var guard *writeGuard
+		if action == "copy" {
+			size := treeSize(d.user.Fs, src)
+			guard, err = d.beginWrite(r.Context(), dst, size, false)
+			if err != nil {
+				return errToStatus(err), err
+			}
+			defer guard.cancel()
+		}
+
 		err = d.RunHook(func() error {
 			return patchAction(r.Context(), action, src, dst, d, fileCache)
 		}, action, src, dst, d.user)
+
+		if guard != nil {
+			if err != nil {
+				d.store.Quota.Invalidate(d.user.ID)
+			} else {
+				guard.finish(d.store.Quota, d.user.ID, treeSize(d.user.Fs, dst))
+			}
+		}
 
 		return errToStatus(err), err
 	})
@@ -506,37 +582,42 @@ var resourceGetRecursiveHandler = withUser(func(w http.ResponseWriter, r *http.R
 })
 
 type DiskUsageResponse struct {
-	Total uint64 `json:"total"`
-	Used  uint64 `json:"used"`
+	Total     uint64 `json:"total"`
+	Used      uint64 `json:"used"`
+	Quota     uint64 `json:"quota"`
+	DiskTotal uint64 `json:"diskTotal"`
+	DiskFree  uint64 `json:"diskFree"`
+	Scoped    bool   `json:"scoped"`
 }
 
 var diskUsage = withUser(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
-	file, err := files.NewFileInfo(&files.FileOptions{
-		Fs:         d.user.Fs,
-		Path:       r.URL.Path,
-		Modify:     d.user.Perm.Modify,
-		Expand:     false,
-		ReadHeader: false,
-		Checker:    d,
-		Content:    false,
-	})
+	diskPath, err := d.diskPath()
 	if err != nil {
 		return errToStatus(err), err
-	}
-	fPath := file.RealPath()
-	if !file.IsDir {
-		return renderJSON(w, r, &DiskUsageResponse{
-			Total: 0,
-			Used:  0,
-		})
 	}
 
-	usage, err := disk.UsageWithContext(r.Context(), fPath)
+	usage, err := disks.Usage(r.Context(), diskPath)
 	if err != nil {
 		return errToStatus(err), err
 	}
-	return renderJSON(w, r, &DiskUsageResponse{
-		Total: usage.Total,
-		Used:  usage.Used,
-	})
+
+	resp := &DiskUsageResponse{
+		Total:     usage.Total,
+		Used:      usage.Used,
+		DiskTotal: usage.Total,
+		DiskFree:  usage.Free,
+	}
+
+	if d.user.Quota > 0 {
+		used, err := d.store.Quota.Used(r.Context(), d.user)
+		if err != nil {
+			return errToStatus(err), err
+		}
+		resp.Scoped = true
+		resp.Quota = uint64(d.user.Quota)
+		resp.Total = uint64(d.user.Quota)
+		resp.Used = uint64(used)
+	}
+
+	return renderJSON(w, r, resp)
 })

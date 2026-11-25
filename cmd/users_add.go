@@ -66,7 +66,16 @@ var usersAddCmd = &cobra.Command{
 			return err
 		}
 
-		userHome, err := s2.MakeUserDir(user.Username, user.Scope, servSettings.Root)
+		diskRoot := servSettings.Root
+		if user.DiskID != 0 {
+			disk, err := st.Disks.Get(user.DiskID)
+			if err != nil {
+				return err
+			}
+			diskRoot = disk.Path
+		}
+
+		userHome, err := s2.MakeUserDir(user.Username, user.Scope, diskRoot)
 		if err != nil {
 			return err
 		}

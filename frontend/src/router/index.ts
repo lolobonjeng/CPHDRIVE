@@ -10,6 +10,7 @@ import Settings from "@/views/Settings.vue";
 import GlobalSettings from "@/views/settings/Global.vue";
 import ProfileSettings from "@/views/settings/Profile.vue";
 import Shares from "@/views/settings/Shares.vue";
+import Disks from "@/views/settings/Disks.vue";
 import Errors from "@/views/Errors.vue";
 import { useAuthStore } from "@/stores/auth";
 import { baseURL, name } from "@/utils/constants";
@@ -27,6 +28,7 @@ const titles = {
   GlobalSettings: "settings.globalSettings",
   Users: "settings.users",
   User: "settings.user",
+  Disks: "settings.disks",
   Forbidden: "errors.forbidden",
   NotFound: "errors.notFound",
   InternalServerError: "errors.internal",
@@ -100,6 +102,14 @@ const routes = [
             path: "users",
             name: "Users",
             component: Users,
+            meta: {
+              requiresAdmin: true,
+            },
+          },
+          {
+            path: "disks",
+            name: "Disks",
+            component: Disks,
             meta: {
               requiresAdmin: true,
             },

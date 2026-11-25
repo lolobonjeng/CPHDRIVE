@@ -1,4 +1,5 @@
 import * as tus from "tus-js-client";
+import i18n from "@/i18n";
 import { baseURL, tusEndpoint, tusSettings, origin } from "@/utils/constants";
 import { useAuthStore } from "@/stores/auth";
 import { removePrefix } from "@/api/utils";
@@ -42,8 +43,11 @@ export async function upload(
           ? err.originalResponse.getStatus()
           : 0;
 
-        // Do not retry for file conflict.
-        if (status === 409) {
+        // 409 is a conflict. 507 means the user's quota or the disk is full,
+        // and 503 means the user's disk is not mounted. None of them get
+        // better by retrying, and retrying leaves the upload bar at 0% for
+        // half a minute before the reason is shown.
+        if (status === 409 || status === 507 || status === 503) {
           return false;
         }
 
@@ -54,6 +58,16 @@ export async function upload(
 
         if (error.message === "Upload aborted") {
           return reject(error);
+        }
+
+        // A 507 covers both the per-user quota and a full disk, and the
+        // generic status body does not say which. Tell the user what they can
+        // act on instead of showing "507 Insufficient Storage".
+        if (
+          error instanceof tus.DetailedError &&
+          error.originalResponse?.getStatus() === 507
+        ) {
+          return reject(new Error(i18n.global.t("settings.noSpace")));
         }
 
         const message =

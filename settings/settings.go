@@ -16,6 +16,10 @@ const DefaultMinimumPasswordLength = 12
 const DefaultFileMode = 0640
 const DefaultDirMode = 0750
 
+// DefaultQuota is the storage a user gets when no explicit quota is set.
+// It is applied to existing accounts once, and to every new account.
+const DefaultQuota int64 = 100 << 30 // 100 GiB
+
 // AuthMethod describes an authentication method.
 type AuthMethod string
 

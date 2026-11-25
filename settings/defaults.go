@@ -19,6 +19,8 @@ type UserDefaults struct {
 	HideDotfiles          bool              `json:"hideDotfiles"`
 	DateFormat            bool              `json:"dateFormat"`
 	AceEditorTheme        string            `json:"aceEditorTheme"`
+	DiskID                uint              `json:"diskID"`
+	Quota                 int64             `json:"quota"`
 }
 
 // Apply applies the default options to a user.
@@ -34,4 +36,6 @@ func (d *UserDefaults) Apply(u *users.User) {
 	u.HideDotfiles = d.HideDotfiles
 	u.DateFormat = d.DateFormat
 	u.AceEditorTheme = d.AceEditorTheme
+	u.DiskID = d.DiskID
+	u.Quota = d.Quota
 }

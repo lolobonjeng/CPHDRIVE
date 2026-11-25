@@ -25,6 +25,8 @@ interface SettingsDefaults {
   hideDotfiles: boolean;
   dateFormat: boolean;
   aceEditorTheme: string;
+  diskID: number;
+  quota: number;
 }
 
 interface SettingsBranding {

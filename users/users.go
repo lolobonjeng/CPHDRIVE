@@ -36,6 +36,19 @@ type User struct {
 	HideDotfiles          bool          `json:"hideDotfiles"`
 	DateFormat            bool          `json:"dateFormat"`
 	AceEditorTheme        string        `json:"aceEditorTheme"`
+
+	// DiskID is the registered disk that holds this user's home. Zero is the
+	// system disk (the server root), so users created before disks existed
+	// keep their current location.
+	DiskID uint `json:"diskID"`
+
+	// Quota is the maximum number of bytes the user may store. Zero means
+	// unlimited.
+	Quota int64 `json:"quota"`
+
+	// DiskOffline is set on listings when the user's disk is not mounted. It
+	// is informational only and never persisted.
+	DiskOffline bool `json:"diskOffline" yaml:"-"`
 }
 
 // GetRules implements rules.Provider.
@@ -51,6 +64,8 @@ var checkableFields = []string{
 	"Commands",
 	"Sorting",
 	"Rules",
+	"DiskID",
+	"Quota",
 }
 
 // Clean cleans up a user and verifies if all its fields
@@ -85,6 +100,10 @@ func (u *User) Clean(baseScope string, followExternalSymlinks bool, fields ...st
 		case "Rules":
 			if u.Rules == nil {
 				u.Rules = []rules.Rule{}
+			}
+		case "Quota":
+			if u.Quota < 0 {
+				return fberrors.ErrInvalidRequestParams
 			}
 		}
 	}

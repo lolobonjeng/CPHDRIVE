@@ -56,9 +56,20 @@ func NewHandler(
 	users := api.PathPrefix("/users").Subrouter()
 	users.Handle("", monkey(usersGetHandler, "")).Methods("GET")
 	users.Handle("", monkey(userPostHandler, "")).Methods("POST")
+	users.Handle("/usage", monkey(usersUsageHandler, "")).Methods("GET")
 	users.Handle("/{id:[0-9]+}", monkey(userPutHandler, "")).Methods("PUT")
 	users.Handle("/{id:[0-9]+}", monkey(userGetHandler, "")).Methods("GET")
 	users.Handle("/{id:[0-9]+}", monkey(userDeleteHandler, "")).Methods("DELETE")
+	users.Handle("/{id:[0-9]+}/move", monkey(userMoveHandler, "")).Methods("POST")
+
+	disksAPI := api.PathPrefix("/disks").Subrouter()
+	disksAPI.Handle("", monkey(disksGetHandler, "")).Methods("GET")
+	disksAPI.Handle("", monkey(diskPostHandler, "")).Methods("POST")
+	disksAPI.Handle("/detect", monkey(diskDetectHandler, "")).Methods("GET")
+	disksAPI.Handle("/{id:[0-9]+}", monkey(diskPutHandler, "")).Methods("PUT")
+	disksAPI.Handle("/{id:[0-9]+}", monkey(diskDeleteHandler, "")).Methods("DELETE")
+
+	api.Handle("/jobs/{id}", monkey(jobGetHandler, "")).Methods("GET")
 
 	api.PathPrefix("/resources/recursive").Handler(monkey(resourceGetRecursiveHandler, "/api/resources/recursive")).Methods("GET")
 	api.PathPrefix("/resources").Handler(monkey(resourceGetHandler, "/api/resources")).Methods("GET")

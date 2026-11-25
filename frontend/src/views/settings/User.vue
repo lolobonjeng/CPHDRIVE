@@ -14,10 +14,22 @@
             v-model:createUserDir="createUserDir"
             :isDefault="false"
             :isNew="isNew"
+            :initialDiskID="originalDiskID"
           />
         </div>
 
         <div class="card-action">
+          <div class="move-progress" v-if="moveState.running">
+            <progress-bar :val="movePercent" size="small"></progress-bar>
+            <p class="small">
+              {{
+                t("settings.moveProgress", {
+                  done: prettyBytes(moveState.done, { binary: true }),
+                  total: prettyBytes(moveState.total, { binary: true }),
+                })
+              }}
+            </p>
+          </div>
           <button
             v-if="!isNew"
             @click.prevent="deletePrompt"
@@ -41,6 +53,7 @@
             class="button button--flat"
             type="submit"
             :value="$t('buttons.save')"
+            :disabled="moveState.running"
           />
         </div>
       </form>
@@ -51,9 +64,11 @@
 <script setup lang="ts">
 import { useAuthStore } from "@/stores/auth";
 import { useLayoutStore } from "@/stores/layout";
-import { users as api, settings } from "@/api";
+import { users as api, settings, disks as disksApi } from "@/api";
 import UserForm from "@/components/settings/UserForm.vue";
+import ProgressBar from "@/components/ProgressBar.vue";
 import Errors from "@/views/Errors.vue";
+import prettyBytes from "pretty-bytes";
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -66,6 +81,16 @@ const originalUser = ref<IUser>();
 const user = ref<IUser>();
 const createUserDir = ref<boolean>(false);
 const isCurrentPasswordRequired = ref<boolean>(false);
+const originalDiskID = ref<number>(0);
+const moveState = ref({ running: false, done: 0, total: 0 });
+
+const movePercent = computed(() => {
+  if (moveState.value.total <= 0) return 0;
+  return Math.min(
+    100,
+    Math.round((moveState.value.done / moveState.value.total) * 100)
+  );
+});
 
 const $showError = inject<IToastError>("$showError")!;
 const $showSuccess = inject<IToastSuccess>("$showSuccess")!;
@@ -104,13 +129,16 @@ const fetchData = async () => {
         lockPassword: false,
         id: 0,
       };
+      originalDiskID.value = user.value.diskID ?? 0;
     } else {
       const { authMethod } = await settings.get();
       isCurrentPasswordRequired.value = authMethod == "json";
       const id = Array.isArray(route.params.id)
         ? route.params.id.join("")
         : route.params.id;
-      user.value = { ...(await api.get(parseInt(id))) };
+      const loaded = await api.get(parseInt(id));
+      user.value = { ...loaded };
+      originalDiskID.value = loaded.diskID ?? 0;
     }
   } catch (err) {
     if (err instanceof Error) {
@@ -180,6 +208,35 @@ const save = (event: Event) => {
   return true;
 };
 
+const waitForMove = async (userID: number, diskID: number) => {
+  const { id } = await disksApi.moveUser(userID, diskID);
+  moveState.value = { running: true, done: 0, total: 0 };
+  $showSuccess(t("settings.moveStarted"));
+
+  const started = Date.now();
+  const limit = 24 * 60 * 60 * 1000;
+
+  while (Date.now() - started < limit) {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const job = await disksApi.getJob(id);
+    moveState.value = {
+      running: job.state === "running",
+      done: job.copied,
+      total: job.total,
+    };
+
+    if (job.state === "done") {
+      $showSuccess(t("settings.moveDone"));
+      return;
+    }
+    if (job.state === "failed") {
+      throw new Error(job.error || t("settings.moveFailed"));
+    }
+  }
+
+  throw new Error(t("settings.moveFailed"));
+};
+
 const send = async (currentPassword: string) => {
   if (!user.value) {
     return false;
@@ -196,15 +253,31 @@ const send = async (currentPassword: string) => {
       router.push({ path: loc || "/settings/users" });
       $showSuccess(t("settings.userCreated"));
     } else {
-      await api.update(user.value, ["all"], currentPassword);
+      // The disk itself is changed by the move endpoint, which copies the
+      // files first. Send the old ID here so the plain update does not get
+      // rejected, then run the move.
+      const targetDisk = user.value.diskID ?? originalDiskID.value;
+      const payload = { ...user.value, diskID: originalDiskID.value };
+
+      await api.update(payload, ["all"], currentPassword);
 
       if (user.value.id === authStore.user?.id) {
-        authStore.updateUser(user.value);
+        authStore.updateUser(payload);
+      }
+
+      if (targetDisk !== originalDiskID.value) {
+        await waitForMove(user.value.id, targetDisk);
+        originalDiskID.value = targetDisk;
+        user.value.diskID = targetDisk;
+        if (user.value.id === authStore.user?.id) {
+          authStore.updateUser(user.value);
+        }
       }
 
       $showSuccess(t("settings.userUpdated"));
     }
   } catch (e: any) {
+    moveState.value.running = false;
     $showError(e);
   }
 };

@@ -24,6 +24,12 @@ var (
 	ErrRootUserDeletion         = errors.New("the sole admin can't be deleted")
 	ErrCurrentPasswordIncorrect = errors.New("the current password is incorrect")
 	ErrShareRequiresDownload    = errors.New("permission to share requires permission to download")
+	ErrQuotaExceeded            = errors.New("storage quota exceeded")
+	ErrDiskFull                 = errors.New("the disk does not have enough free space")
+	ErrDiskUnavailable          = errors.New("the disk is unavailable")
+	ErrDiskInUse                = errors.New("the disk still has users assigned")
+	ErrDiskInvalid              = errors.New("invalid disk")
+	ErrUserMoving               = errors.New("the user is being moved to another disk")
 )
 
 type ErrShortPassword struct {

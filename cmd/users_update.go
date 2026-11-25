@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+
 	"github.com/spf13/cobra"
 
 	"github.com/filebrowser/filebrowser/v2/settings"
@@ -60,12 +62,20 @@ options you want to change.`,
 			Perm:                  user.Perm,
 			Sorting:               user.Sorting,
 			Commands:              user.Commands,
+			DiskID:                user.DiskID,
+			Quota:                 user.Quota,
 		}
 
 		err = getUserDefaults(flags, &defaults, false)
 		if err != nil {
 			return err
 		}
+
+		if defaults.DiskID != user.DiskID {
+			return errors.New("changing a user's disk moves their files; use the Disks page in the web UI")
+		}
+		user.DiskID = defaults.DiskID
+		user.Quota = defaults.Quota
 
 		user.Scope = defaults.Scope
 		user.Locale = defaults.Locale

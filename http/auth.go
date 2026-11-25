@@ -135,7 +135,7 @@ func withUser(fn handleFunc) handleFunc {
 
 		d.user, err = d.store.Users.Get(d.server.Root, d.server.FollowExternalSymlinks, tk.User.ID)
 		if err != nil {
-			return http.StatusInternalServerError, err
+			return errToStatus(err), err
 		}
 
 		canonicalizeRequestPath(r)
@@ -168,6 +168,8 @@ func loginHandler(tokenExpireTime time.Duration) handleFunc {
 		switch {
 		case errors.Is(err, os.ErrPermission):
 			return http.StatusForbidden, nil
+		case errors.Is(err, fberrors.ErrDiskUnavailable):
+			return http.StatusServiceUnavailable, err
 		case err != nil:
 			return http.StatusInternalServerError, err
 		}

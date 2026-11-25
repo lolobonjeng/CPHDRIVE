@@ -27,13 +27,15 @@ var usersCmd = &cobra.Command{
 
 func printUsers(usrs []*users.User) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tUsername\tScope\tLocale\tV. Mode\tS.Click\tRed. After C/M\tAdmin\tExecute\tCreate\tRename\tModify\tDelete\tShare\tDownload\tPwd Lock")
+	fmt.Fprintln(w, "ID\tUsername\tScope\tDisk\tQuota\tLocale\tV. Mode\tS.Click\tRed. After C/M\tAdmin\tExecute\tCreate\tRename\tModify\tDelete\tShare\tDownload\tPwd Lock")
 
 	for _, u := range usrs {
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%t\t%t\t%t\t%t\t%t\t%t\t%t\t%t\t%t\t%t\t%t\t\n",
+		fmt.Fprintf(w, "%d\t%s\t%s\t%d\t%s\t%s\t%s\t%t\t%t\t%t\t%t\t%t\t%t\t%t\t%t\t%t\t%t\t%t\t\n",
 			u.ID,
 			u.Username,
 			u.Scope,
+			u.DiskID,
+			quotaLabel(u.Quota),
 			u.Locale,
 			u.ViewMode,
 			u.SingleClick,
@@ -51,6 +53,13 @@ func printUsers(usrs []*users.User) {
 	}
 
 	w.Flush()
+}
+
+func quotaLabel(bytes int64) string {
+	if bytes == 0 {
+		return "unlimited"
+	}
+	return fmt.Sprintf("%.1f GiB", float64(bytes)/float64(int64(1)<<30))
 }
 
 func parseUsernameOrID(arg string) (username string, id uint) {
@@ -82,6 +91,8 @@ func addUserFlags(flags *pflag.FlagSet) {
 	flags.Bool("dateFormat", false, "use date format (true for absolute time, false for relative)")
 	flags.Bool("hideDotfiles", false, "hide dotfiles in file listings")
 	flags.String("aceEditorTheme", "", "ace editor's syntax highlighting theme for users")
+	flags.Uint("disk", 0, "disk ID that holds the user's home")
+	flags.Float64("quota", float64(settings.DefaultQuota)/float64(int64(1)<<30), "storage quota in GiB (0 for unlimited)")
 }
 
 func getAndParseViewMode(flags *pflag.FlagSet) (users.ViewMode, error) {
@@ -142,6 +153,19 @@ func getUserDefaults(flags *pflag.FlagSet, defaults *settings.UserDefaults, all 
 			defaults.DateFormat, err = flags.GetBool(flag.Name)
 		case "hideDotfiles":
 			defaults.HideDotfiles, err = flags.GetBool(flag.Name)
+		case "disk":
+			defaults.DiskID, err = flags.GetUint(flag.Name)
+		case "quota":
+			var gb float64
+			gb, err = flags.GetFloat64(flag.Name)
+			if err != nil {
+				break
+			}
+			if gb < 0 {
+				err = errors.New("quota cannot be negative")
+				break
+			}
+			defaults.Quota = int64(gb * float64(int64(1)<<30))
 		}
 
 		if err != nil {

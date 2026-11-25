@@ -4,6 +4,10 @@ export async function getAll() {
   return fetchJSON<IUser[]>(`/api/users`, {});
 }
 
+export async function getUsage() {
+  return fetchJSON<IUserUsage[]>(`/api/users/usage`, {});
+}
+
 export async function get(id: number) {
   return fetchJSON<IUser>(`/api/users/${id}`, {});
 }

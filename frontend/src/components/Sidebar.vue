@@ -46,6 +46,38 @@
         </button>
       </div>
 
+      <div
+        class="nav-group nav-disks"
+        v-if="user.perm.admin && disks.length > 0"
+      >
+        <p class="nav-label">{{ $t("settings.disks") }}</p>
+        <button
+          v-for="disk in disks"
+          :key="disk.id"
+          class="disk-row"
+          type="button"
+          :title="disk.path"
+          @click="toDisks"
+        >
+          <i class="material-icons">storage</i>
+          <span class="disk-row-name">{{ disk.name }}</span>
+          <span class="disk-mini-bar" v-if="disk.online">
+            <span
+              :style="{
+                width: diskPercent(disk) + '%',
+                background: diskBarColor(disk),
+              }"
+            ></span>
+          </span>
+          <span class="disk-row-free" v-if="disk.online">{{
+            prettyFree(disk)
+          }}</span>
+          <span class="disk-row-free disk-row-offline" v-else>{{
+            $t("settings.offline")
+          }}</span>
+        </button>
+      </div>
+
       <div class="nav-group">
         <button
           class="action"
@@ -123,8 +155,21 @@
       </router-link>
     </template>
 
-    <div class="nav-usage" v-if="isFiles && !disableUsedPercentage">
-      <progress-bar :val="usage.usedPercentage" size="small"></progress-bar>
+    <div
+      class="nav-usage"
+      :class="{ 'nav-usage--over': usage.scoped && usage.usedPercentage >= 100 }"
+      v-if="isFiles && !disableUsedPercentage"
+    >
+      <p class="nav-usage-label" v-if="usage.scoped">
+        {{ $t("settings.quota") }}
+      </p>
+      <progress-bar
+        :val="usage.usedPercentage"
+        size="small"
+        :bar-color="
+          usage.scoped && usage.usedPercentage >= 100 ? '#ff453a' : '#0a84ff'
+        "
+      ></progress-bar>
       <p>
         {{ $t("sidebar.diskUsed", { used: usage.used, total: usage.total }) }}
       </p>
@@ -163,20 +208,27 @@ import {
   logoutPage,
   loginPage,
 } from "@/utils/constants";
-import { files as api } from "@/api";
+import { files as api, disks as disksApi } from "@/api";
 import ProgressBar from "@/components/ProgressBar.vue";
 import prettyBytes from "pretty-bytes";
 
-const USAGE_DEFAULT = { used: "0 B", total: "0 B", usedPercentage: 0 };
+const USAGE_DEFAULT = {
+  used: "0 B",
+  total: "0 B",
+  usedPercentage: 0,
+  scoped: false,
+};
 
 export default {
   name: "sidebar",
   setup() {
     const usage = reactive(USAGE_DEFAULT);
     const activeTheme = ref(getTheme());
+    const disks = ref([]);
     return {
       usage,
       activeTheme,
+      disks,
       usageAbortController: new AbortController(),
     };
   },
@@ -217,7 +269,14 @@ export default {
         usageStats = {
           used: prettyBytes(usage.used, { binary: true }),
           total: prettyBytes(usage.total, { binary: true }),
-          usedPercentage: Math.round((usage.used / usage.total) * 100),
+          usedPercentage:
+            usage.total > 0
+              ? Math.min(
+                  100,
+                  Math.round((usage.used / usage.total) * 100)
+                )
+              : 0,
+          scoped: !!usage.scoped,
         };
       } finally {
         return Object.assign(this.usage, usageStats);
@@ -226,6 +285,32 @@ export default {
     toRoot() {
       this.$router.push({ path: "/files" });
       this.closeHovers();
+    },
+    async fetchDisks() {
+      if (!this.user?.perm.admin) {
+        this.disks = [];
+        return;
+      }
+      try {
+        this.disks = await disksApi.getAll();
+      } catch (e) {
+        // Keep the previous list when the disks endpoint is unavailable.
+      }
+    },
+    toDisks() {
+      this.$router.push({ path: "/settings/disks" });
+      this.closeHovers();
+    },
+    diskPercent(disk) {
+      if (!disk.total) return 0;
+      return Math.min(100, Math.round((disk.used / disk.total) * 100));
+    },
+    diskBarColor(disk) {
+      if (!disk.total) return "#0a84ff";
+      return disk.used / disk.total > 0.9 ? "#ff453a" : "#0a84ff";
+    },
+    prettyFree(disk) {
+      return prettyBytes(disk.free, { binary: true });
     },
     // Drop the sidebar's own prompt before opening the menu. Otherwise closing
     // the menu pops back to "sidebar" and the drawer slides in again on phones.
@@ -265,12 +350,24 @@ export default {
         if (to.path.includes("/files")) {
           this.fetchUsage();
         }
+        this.fetchDisks();
       },
       immediate: true,
+    },
+    // The meter is only fetched on navigation. Uploads, deletes, renames and
+    // moves change the used bytes while the user stays on the same folder, so
+    // follow the listing's own reload flag instead.
+    reload(value) {
+      if (!value) return;
+      if (this.$route.path.includes("/files")) {
+        this.fetchUsage();
+      }
+      this.fetchDisks();
     },
   },
   mounted() {
     window.addEventListener("resize", this.dropDrawerOnDesktop);
+    this.fetchDisks();
   },
   unmounted() {
     window.removeEventListener("resize", this.dropDrawerOnDesktop);

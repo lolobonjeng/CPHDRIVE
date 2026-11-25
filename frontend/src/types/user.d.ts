@@ -15,6 +15,9 @@ interface IUser {
   viewMode: ViewModeType;
   sorting?: Sorting;
   aceEditorTheme: string;
+  diskID: number;
+  quota: number;
+  diskOffline?: boolean;
 }
 
 type ViewModeType = "list" | "mosaic" | "mosaic gallery";
@@ -33,6 +36,8 @@ interface IUserForm {
   singleClick?: boolean;
   redirectAfterCopyMove?: boolean;
   dateFormat?: boolean;
+  diskID?: number;
+  quota?: number;
 }
 
 interface Permissions {

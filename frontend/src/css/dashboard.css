@@ -22,6 +22,13 @@ html[dir="rtl"] .dashboard .row {
   flex-grow: 1;
 }
 
+/* Settings pages whose content is a table or a card grid opt out of the
+   two-column dashboard split. Without this the users table scrolls
+   sideways inside a 50% column. */
+.dashboard .row .column.column--wide {
+  width: 100%;
+}
+
 @media (max-width: 1200px) {
   .dashboard .row .column {
     width: 100%;

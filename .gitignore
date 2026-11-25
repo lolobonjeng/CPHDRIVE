@@ -40,3 +40,5 @@ build/
 
 default.nix
 Dockerfile.dev
+/test-disk2/
+/test-disk2-unmounted/

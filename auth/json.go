@@ -2,11 +2,13 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 
+	fberrors "github.com/filebrowser/filebrowser/v2/errors"
 	"github.com/filebrowser/filebrowser/v2/settings"
 	"github.com/filebrowser/filebrowser/v2/users"
 )
@@ -56,6 +58,17 @@ func (a JSONAuth) Auth(r *http.Request, usr users.Store, _ *settings.Settings, s
 	}
 
 	u, err := usr.Get(srv.Root, srv.FollowExternalSymlinks, cred.Username)
+
+	// The disk being unavailable is not a credential problem. Authenticate
+	// against the stored row first so only the real owner learns that their
+	// storage is offline, then surface the disk error itself.
+	if errors.Is(err, fberrors.ErrDiskUnavailable) {
+		stored, storedErr := usr.GetByUsername(cred.Username)
+		if storedErr == nil && users.CheckPwd(cred.Password, stored.Password) {
+			return nil, err
+		}
+		return nil, os.ErrPermission
+	}
 
 	hash := dummyHash
 	if err == nil {
