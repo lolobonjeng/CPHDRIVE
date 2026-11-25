@@ -1,98 +1,108 @@
 <template>
-  <div>
-    <p v-if="!isDefault && props.user !== null">
-      <label for="username">{{ t("settings.username") }}</label>
-      <input
-        class="input input--block"
-        type="text"
-        v-model="user.username"
-        id="username"
-      />
-    </p>
+  <div class="user-form" :class="{ 'user-form--wide': wide }">
+    <div class="uf-col">
+      <section class="uf-section">
+        <h3 v-if="!isDefault">{{ t("settings.account") }}</h3>
 
-    <p v-if="!isDefault">
-      <label for="password">{{ t("settings.password") }}</label>
-      <input
-        class="input input--block"
-        type="password"
-        :placeholder="passwordPlaceholder"
-        v-model="user.password"
-        id="password"
-      />
-    </p>
+        <p v-if="!isDefault && props.user !== null">
+          <label for="username">{{ t("settings.username") }}</label>
+          <input
+            class="input input--block"
+            type="text"
+            v-model="user.username"
+            id="username"
+          />
+        </p>
 
-    <p>
-      <label for="scope">{{ t("settings.scope") }}</label>
-      <input
-        :disabled="createUserDirData ?? false"
-        :placeholder="scopePlaceholder"
-        class="input input--block"
-        type="text"
-        v-model="user.scope"
-        id="scope"
-      />
-    </p>
-    <p class="small" v-if="displayHomeDirectoryCheckbox">
-      <input type="checkbox" v-model="createUserDirData" />
-      {{ t("settings.createUserHomeDirectory") }}
-    </p>
+        <p v-if="!isDefault">
+          <label for="password">{{ t("settings.password") }}</label>
+          <input
+            class="input input--block"
+            type="password"
+            :placeholder="passwordPlaceholder"
+            v-model="user.password"
+            id="password"
+          />
+        </p>
 
-    <p>
-      <label for="locale">{{ t("settings.language") }}</label>
-      <languages
-        class="input input--block"
-        id="locale"
-        v-model:locale="user.locale"
-      ></languages>
-    </p>
+        <p>
+          <label for="scope">{{ t("settings.scope") }}</label>
+          <input
+            :disabled="createUserDirData ?? false"
+            :placeholder="scopePlaceholder"
+            class="input input--block"
+            type="text"
+            v-model="user.scope"
+            id="scope"
+          />
+        </p>
 
-    <p v-if="!isDefault && user.perm">
-      <input
-        type="checkbox"
-        :disabled="user.perm.admin"
-        v-model="user.lockPassword"
-      />
-      {{ t("settings.lockPassword") }}
-    </p>
+        <p class="small" v-if="displayHomeDirectoryCheckbox">
+          <input type="checkbox" v-model="createUserDirData" />
+          {{ t("settings.createUserHomeDirectory") }}
+        </p>
 
-    <permissions v-model:perm="user.perm" />
-    <commands v-if="enableExec" v-model:commands="user.commands" />
+        <p>
+          <label for="locale">{{ t("settings.language") }}</label>
+          <languages
+            class="input input--block"
+            id="locale"
+            v-model:locale="user.locale"
+          ></languages>
+        </p>
 
-    <div v-if="!isDefault" class="user-storage">
-      <h3>{{ t("settings.storage") }}</h3>
-      <p>
-        <label for="disk">{{ t("settings.disk") }}</label>
-        <select class="input input--block" id="disk" v-model.number="user.diskID">
-          <option v-for="disk in disks" :key="disk.id" :value="disk.id">
-            {{ disk.name }} — {{ disk.path }}
-          </option>
-        </select>
-      </p>
-      <p>
-        <label for="quota">{{ t("settings.quotaLabel") }}</label>
-        <input
-          class="input input--block"
-          id="quota"
-          type="number"
-          min="0"
-          step="any"
-          v-model.number="quotaGB"
-        />
-        <span class="small">{{ t("settings.quotaHelp") }}</span>
-      </p>
-      <p
-        class="small user-storage-warning"
-        v-if="!isNew && user.diskID !== (initialDiskID ?? 0)"
-      >
-        {{ t("settings.diskChangeWarning") }}
-      </p>
+        <p v-if="!isDefault && user.perm">
+          <input
+            type="checkbox"
+            :disabled="user.perm.admin"
+            v-model="user.lockPassword"
+          />
+          {{ t("settings.lockPassword") }}
+        </p>
+      </section>
+
+      <section v-if="!isDefault" class="uf-section user-storage">
+        <h3>{{ t("settings.storage") }}</h3>
+        <p>
+          <label for="disk">{{ t("settings.disk") }}</label>
+          <select class="input input--block" id="disk" v-model.number="user.diskID">
+            <option v-for="disk in disks" :key="disk.id" :value="disk.id">
+              {{ disk.name }} — {{ disk.path }}
+            </option>
+          </select>
+        </p>
+        <p>
+          <label for="quota">{{ t("settings.quotaLabel") }}</label>
+          <input
+            class="input input--block"
+            id="quota"
+            type="number"
+            min="0"
+            step="any"
+            v-model.number="quotaGB"
+          />
+          <span class="small">{{ t("settings.quotaHelp") }}</span>
+        </p>
+        <p
+          class="small user-storage-warning"
+          v-if="!isNew && user.diskID !== (initialDiskID ?? 0)"
+        >
+          {{ t("settings.diskChangeWarning") }}
+        </p>
+      </section>
     </div>
 
-    <div v-if="!isDefault">
+    <div class="uf-col">
+      <permissions class="uf-section" v-model:perm="user.perm" />
+
+      <commands class="uf-section" v-if="enableExec" v-model:commands="user.commands" />
+    </div>
+
+    <section v-if="!isDefault" class="uf-section uf-section--rules">
       <h3>{{ t("settings.rules") }}</h3>
       <p class="small">{{ t("settings.rulesHelp") }}</p>
       <rules v-model:rules="user.rules" />
-    </div>
+    </section>
   </div>
 </template>
 
@@ -120,6 +130,10 @@ const props = defineProps<{
   // The disk the user was loaded on. The parent owns it because a successful
   // move changes it, and the warning must disappear when it does.
   initialDiskID?: number;
+  // Lay the sections out in two columns. Only the full-width user page asks for
+  // it; the user-defaults card on the Global page is half width and stays
+  // stacked.
+  wide?: boolean;
 }>();
 
 onMounted(async () => {

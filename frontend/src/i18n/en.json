@@ -331,7 +331,8 @@
     "reasonServerRoot": "This is the folder File Browser serves, or it contains it.",
     "reasonNotMount": "Inside the served folder but not a separate drive.",
     "reasonRegistered": "This folder is already a disk.",
-    "reasonNested": "This folder is inside another disk, or contains one."
+    "reasonNested": "This folder is inside another disk, or contains one.",
+    "account": "Account"
   },
   "sidebar": {
     "diskUsed": "{used} of {total} used",

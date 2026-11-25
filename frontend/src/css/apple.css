@@ -1512,6 +1512,90 @@ input[type="radio"] {
   color: #ff9500 !important;
 }
 
+/* --------------------------------------------------------------------------
+   16c. User form
+   -------------------------------------------------------------------------- */
+
+/* The user page runs the full width, so the form splits into two columns:
+   the account fields on the left, permissions and storage on the right, and
+   the rule list across the bottom because each row is a regex plus a path.
+   The user-defaults card on the Global page stays stacked. */
+.user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.user-form--wide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 44px;
+  align-items: start;
+}
+
+.uf-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.uf-section > h3 {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--textSecondary);
+}
+
+.uf-section p {
+  margin: 0 0 14px;
+}
+
+.uf-section > *:last-child {
+  margin-bottom: 0;
+}
+
+.user-form--wide .uf-section--rules {
+  grid-column: 1 / -1;
+  margin-top: 26px;
+}
+
+/* A regex row does not need 1300px of input, and the upstream sheet pushes the
+   New button to the far right of its row, which reads as detached once the
+   section spans the page. */
+.user-form--wide .uf-section--rules .rules {
+  max-width: 860px;
+}
+
+.user-form--wide .uf-section--rules .rules > div:last-child button {
+  margin-left: 0;
+}
+
+/* In the two-column layout storage is its own section with a heading, so the
+   separator that used to set it apart from the fields above is redundant. */
+.user-form--wide .user-storage {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* The card is full width here, and the default 1.4em gutters leave the form
+   hugging the edge. */
+.dashboard .user-card > div {
+  padding-left: 2em;
+  padding-right: 2em;
+}
+
+@media (max-width: 1000px) {
+  .user-form--wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .user-form--wide .uf-section--rules {
+    margin-top: 24px;
+  }
+}
+
 /* A chosen folder is shown, not typed. The picker does the navigation, so the
    field is a value plus a trigger. */
 .disk-path-field {
