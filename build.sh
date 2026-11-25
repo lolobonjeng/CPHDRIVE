@@ -219,6 +219,17 @@
 #      disk and why not. The disk form uses it through a folder picker modal
 #      (components/settings/DiskPathPicker.vue) instead of a typed path.
 #
+#  34. frontend/src/views/settings/User.vue
+#      The edit form now takes the full width (.column--wide) instead of the
+#      half-width column upstream gives it, which left the right side of the
+#      page empty after the first save.
+#      frontend/src/components/settings/UserForm.vue
+#      A `wide` prop splits the form into two columns: account fields and
+#      storage on the left, permissions and commands on the right, rules across
+#      the bottom. Only the full-width page asks for it; the user-defaults card
+#      on the Global page is half width and stays stacked.
+#      frontend/src/css/apple.css  block "16c. User form".
+#
 # The visual design is NOT inside the binary. It is served at runtime from the
 # directory named by the database setting branding.files (on the server:
 # /root/filebrowser-branding, holding custom.css and img/logo.svg). A copy
