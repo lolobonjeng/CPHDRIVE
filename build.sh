@@ -235,7 +235,9 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 VERSION=2.63.23
-COMMIT=e8a388f8
+# The base is upstream e8a388f8; report this tree's commit so the About dialog
+# identifies the build that is actually running.
+COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo e8a388f8)
 GO=${GO:-/c/dev/go/bin/go}
 
 echo "==> frontend"
