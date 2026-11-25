@@ -177,6 +177,30 @@
 #      in-flight request. The empty state says "No results" once a search
 #      finishes with nothing, and the spinner covers the debounce window.
 #
+#   Per-user quotas and multiple disks
+#  32. New packages: disks/ (registry, validation, usage, move) and quota/
+#      (cached usage + reservations). Disk 0 is virtual and maps to the server
+#      root, so users that predate the feature need no migration.
+#      users/storage.go resolves a user's filesystem from their DiskID, so
+#      files, search, shares, preview and TUS all follow the disk through one
+#      hook. Writes are guarded in http/quota.go: a reservation is held for
+#      the expected growth, so two concurrent uploads cannot spend the same
+#      bytes, and the disk's real free space is a second limit with a
+#      1%-clamped reserve.
+#      Endpoints: GET/POST /api/disks, PUT/DELETE /api/disks/{id},
+#      GET /api/disks/detect, GET /api/users/usage,
+#      POST /api/users/{id}/move, GET /api/jobs/{id}. A disk change through
+#      the plain user update is rejected; only the move endpoint switches a
+#      user, because it copies and verifies the files first.
+#      UI: settings/Disks.vue, disk rows in the sidebar, disk/quota/used
+#      columns in the user list, and a storage section on the user form.
+#      Existing non-admin users get the 100 GiB default once, behind the
+#      defaultQuotaV1 marker in the config bucket, so an admin can later set a
+#      user back to unlimited without the next start undoing it.
+#      An offline disk is reported instead of hidden: the user list says
+#      Offline, login returns 503 after the password checks out (no user
+#      enumeration), and TUS no longer retries 507/503.
+#
 # The visual design is NOT inside the binary. It is served at runtime from the
 # directory named by the database setting branding.files (on the server:
 # /root/filebrowser-branding, holding custom.css and img/logo.svg). A copy
